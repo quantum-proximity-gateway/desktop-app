@@ -2,10 +2,11 @@ use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, Chat
 use ollama_rs::Ollama;
 use serde::Deserialize;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
+use tokio::sync::Mutex as TokioMutex;
+use tauri::State;
 
 
-static OLLAMA: Lazy<Mutex<Ollama>> = Lazy::new(|| Mutex::new(Ollama::new_default_with_history(30))); // this needs to be fixed/figured out
+struct OllamaInstance(TokioMutex<Ollama>);
 
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
@@ -26,8 +27,8 @@ struct ChatRequest {
 }
 
 #[tauri::command]
-async fn generate(request:ChatRequest) -> Result<ChatMessageResponse, String> {
-    let mut ollama = Ollama::new_default_with_history(30);
+async fn generate(request:ChatRequest, g_ollama: State<'_, OllamaInstance>) -> Result<ChatMessageResponse, String> {
+    let mut ollama = g_ollama.0.lock().await;
     match ollama.send_chat_messages_with_history(
         ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
         request.chat_id,
@@ -44,6 +45,7 @@ async fn generate(request:ChatRequest) -> Result<ChatMessageResponse, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(OllamaInstance(TokioMutex::new(Ollama::new_default_with_history(30))))
         .invoke_handler(tauri::generate_handler![list_models, generate])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

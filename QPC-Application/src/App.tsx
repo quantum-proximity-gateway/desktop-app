@@ -7,7 +7,7 @@ function App() {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState([{ sender: "system", text: "Welcome! Please select a model and type your prompt." }]);
+  const [messages, setMessages] = useState([{sender: "", text: ""}]);
   const [chatID, setChatID] = useState("");
   
   async function listModels() {
@@ -40,7 +40,7 @@ function App() {
     const userMessage = { sender: "user", text: prompt };
     setMessages([...messages, userMessage]);
     setPrompt("");
-    const response: Response = await invoke("generate", { request: { model: selectedModel, prompt, chatID } });
+    const response: Response = await invoke("generate", { request: { model: selectedModel, prompt, chat_id: chatID }});
     const botMessage = { sender: "bot", text: response.message.content };
     setMessages([...messages, userMessage, botMessage]);
   }
@@ -49,7 +49,7 @@ function App() {
   function selectModel(model: string) {
     setSelectedModel(model);
     setChatID(model);
-    setMessages([{ sender: "system", text: "You're now chatting with: " + model }]);
+    setMessages([{sender: "", text: ""}]);
   }
 
   useEffect(() => { // runs once when the component is mounted
@@ -71,7 +71,7 @@ function App() {
         </Box>
         <Box border="1px" borderColor="gray.200" borderRadius="md" p={4} h="400px" overflowY="scroll">
           {messages.map((message, index) => (
-            <Box key={index} mb={2} textAlign={message.sender === "user" ? "right" : "left"}>
+            <Box key={index} mb={2} textAlign={message.sender === "user" ? "right" : "left"} style={{backgroundColor: message.sender === "user" ? "#2F2F2F" : "#3C5962", borderRadius: "5px", padding: "5px"}}>
               <Text fontWeight={message.sender === "user" ? "bold" : "normal"}>{message.text}</Text>
             </Box>
           ))}

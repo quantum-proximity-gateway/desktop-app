@@ -1,11 +1,11 @@
-use ollama_rs::{generation::{chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse}, completion::{
-        request::GenerationRequest, GenerationContext, GenerationResponse
-    }},
-    Ollama
-    
-};
+use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
+use ollama_rs::Ollama;
 use serde::Deserialize;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
+
+static OLLAMA: Lazy<Mutex<Ollama>> = Lazy::new(|| Mutex::new(Ollama::new_default_with_history(30))); // this needs to be fixed/figured out
 
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
@@ -22,15 +22,15 @@ async fn list_models() -> Result<Vec<String>, String> {
 struct ChatRequest {
     model: String,
     prompt: String,
-    chatID: String,
+    chat_id: String,
 }
 
 #[tauri::command]
 async fn generate(request:ChatRequest) -> Result<ChatMessageResponse, String> {
-    let ollama = Ollama::default();
-    match ollama.send_chat_messages(
+    let mut ollama = Ollama::new_default_with_history(30);
+    match ollama.send_chat_messages_with_history(
         ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
-
+        request.chat_id,
     ).await {
         Ok(res) => Ok(res),
         Err(e) => Err(format!("Failed to generate text: {}", e)),

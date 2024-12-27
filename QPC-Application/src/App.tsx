@@ -57,31 +57,31 @@ function App() {
   }, []);
 
   return (
-    <Box className="App" p={4}>
-      <Text fontSize="2xl" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
-      <VStack align="stretch">
-        <Box>
-          <Text>Avaliable models:</Text>
-          <HStack mt={2}>
-            {models.map((model, index) => (
-              <Button key={index} onClick={() => selectModel(model)}>{model}</Button>
-            ))}
-          </HStack>
-          <Text mt={2}>Selected model: {selectedModel}</Text>
-        </Box>
-        <Box border="1px" borderColor="gray.200" borderRadius="md" p={4} h="400px" overflowY="scroll">
-          {messages.map((message, index) => (
-            <Box key={index} mb={2} textAlign={message.sender === "user" ? "right" : "left"} style={{backgroundColor: message.sender === "user" ? "#2F2F2F" : "#3C5962", borderRadius: "5px", padding: "5px"}}>
-              <Text fontWeight={message.sender === "user" ? "bold" : "normal"}>{message.text}</Text>
-            </Box>
+    <Box className="App" p={4} display="flex" flexDirection="column" height="100vh">
+    <Text fontSize="2xl" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
+    <VStack align="stretch" flex="1">
+      <Box>
+        <Text>Avaliable models:</Text>
+        <HStack mt={2}>
+          {models.map((model, index) => (
+            <Button key={index} onClick={() => selectModel(model)}>{model}</Button>
           ))}
-        </Box>
-        <HStack>
-          <Input placeholder="Type your prompt:" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-          <Button onClick={generate}>Send</Button>
         </HStack>
-      </VStack>
-    </Box>
+        <Text mt={2}>Selected model: {selectedModel}</Text>
+      </Box>
+      <Box border="1px" borderColor="gray.200" borderRadius="md" p={4} h="400px" overflowY="scroll" flex="1">
+        {messages.map((message, index) => (
+          <Box key={index} mb={2} textAlign={message.sender === "user" ? "right" : "left"}>
+            <Text fontWeight={message.sender === "user" ? "bold" : "normal"}>{message.text}</Text>
+          </Box>
+        ))}
+      </Box>
+      <HStack mt={4}>
+        <Input placeholder="Type your prompt:" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+        <Button onClick={generate}>Send</Button>
+      </HStack>
+    </VStack>
+  </Box>
 
   );
 }

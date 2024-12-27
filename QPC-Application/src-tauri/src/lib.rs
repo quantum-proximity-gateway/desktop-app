@@ -1,7 +1,6 @@
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
 use ollama_rs::Ollama;
 use serde::Deserialize;
-use std::sync::Mutex;
 use tokio::sync::Mutex as TokioMutex;
 use tauri::State;
 

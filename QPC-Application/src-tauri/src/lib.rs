@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-
+use ollama_rs::generation::chat::MessageRole;
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
 use ollama_rs::Ollama;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use tokio::sync::Mutex as TokioMutex;
 use tauri::State;
 
@@ -21,15 +21,30 @@ async fn list_models() -> Result<Vec<String>, String> {
         Err(e) => Err(format!("Failed to list models: {}", e)),
     }
 }
-#[derive(Deserialize)]
+
+
+#[derive(Debug, Deserialize)]
 struct ChatRequest {
     model: String,
     prompt: String,
     chat_id: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct ModelResponse { // This is the response the model is trained to give
+    message: String,
+    command: String
+}
+
+fn parse_model_response(json_str: String) -> Result<ModelResponse, serde_json::Error> {
+    // Sometimes the model might not respond in the right format, we need to think of a way to handle that.
+    let parsed_response: ModelResponse = serde_json::from_str(&json_str)?;
+    Ok(parsed_response)
+}
+
 #[tauri::command]
 async fn generate(request:ChatRequest, g_ollama: State<'_, OllamaInstance>, seen_chats: State<'_, ChatIDs>) -> Result<ChatMessageResponse, String> {
+    println!("Generating response for {:?}", request);
     let mut ollama = g_ollama.0.lock().await;
     let mut seen_chats = seen_chats.0.lock().await;
     if !seen_chats.contains_key(&request.chat_id) {
@@ -45,7 +60,22 @@ async fn generate(request:ChatRequest, g_ollama: State<'_, OllamaInstance>, seen
         ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
         request.chat_id,
     ).await {
-        Ok(res) => Ok(res),
+        Ok(mut res) => {
+            println!("Received initial response: {:?}", res);
+            let response = res.message.unwrap().content;
+            match parse_model_response(response) {
+                Ok(parsed_response) => {
+                    // execute shell command https://v1.tauri.app/v1/api/js/shell/
+                    println!("Command executed: {}", parsed_response.command);
+                    res.message = Some(ChatMessage::new(MessageRole::Assistant, parsed_response.message)); 
+                    println!("Model Response: {:?}", res);
+                    Ok(res)
+                }
+                Err(e) => {
+                    Err(format!("Failed to parse model response: {}", e))
+                }
+            }
+        },
         Err(e) => Err(format!("Failed to generate text: {}", e)),
     }
 }

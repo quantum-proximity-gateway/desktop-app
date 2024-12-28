@@ -4,6 +4,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        
       - name: tauri-build
         uses: JonasKruckenberg/tauri-build@v1.0.3
         with:

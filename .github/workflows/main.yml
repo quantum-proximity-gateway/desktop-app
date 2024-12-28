@@ -5,6 +5,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: tauri-build
-        uses: tauri-apps/tauri-action@v0
+        uses: JonasKruckenberg/tauri-build@v1.0.3
         with:
-          projectPath: /qpc-application
+          projectPath: './QPC-Application'
+
+        
+              

@@ -1,0 +1,10 @@
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: tauri-build
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: /qpc-application

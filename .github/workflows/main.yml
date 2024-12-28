@@ -6,11 +6,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-        
-      - name: tauri-build
-        uses: JonasKruckenberg/tauri-build@v1.0.3
-        with:
-          projectPath: './QPC-Application'
 
-        
-              
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./QPC-Application 
+
+      - name: Build Tauri dev
+        run: npm build tauri dev
+        working-directory: ./QPC-Application

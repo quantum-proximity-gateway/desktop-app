@@ -13,13 +13,27 @@ struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
     let ollama = Ollama::default();
-    match ollama.list_local_models().await {
-        Ok(res) => {
-            let models: Vec<String> = res.into_iter().map(|model| model.name).collect();
-            Ok(models)
+    let default_model_name = "granite-code:3b".to_string();
+
+    let local_models = match ollama.list_local_models().await {
+        Ok(res) => res,
+        Err(e) => return Err(format!("Failed to list models: {}", e)),
+    };
+
+    if local_models.is_empty() {
+        println!("No local models found. Pulling {}...", default_model_name);
+        if let Err(e) = ollama.pull_model(default_model_name.into(), true).await {
+            return Err(format!("Failed to pull model: {}", e));
         }
-        Err(e) => Err(format!("Failed to list models: {}", e)),
     }
+
+    let updated_models = match ollama.list_local_models().await {
+        Ok(res) => res,
+        Err(e) => return Err(format!("Failed to list models: {}", e)),
+    };
+
+    let models: Vec<String> = updated_models.into_iter().map(|model| model.name).collect();
+    Ok(models)
 }
 
 #[derive(Debug, Deserialize)]

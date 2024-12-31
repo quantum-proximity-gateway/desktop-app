@@ -20,9 +20,9 @@ async fn list_models() -> Result<Vec<String>, String> {
         Err(e) => return Err(format!("Failed to list models: {}", e)),
     };
 
-    if local_models.is_empty() {
+    if local_models.is_empty() { // Download model in the case that it does not exist
         println!("No local models found. Pulling {}...", default_model_name);
-        if let Err(e) = ollama.pull_model(default_model_name.into(), true).await {
+        if let Err(e) = ollama.pull_model(default_model_name.into(), false).await {
             return Err(format!("Failed to pull model: {}", e));
         }
     }

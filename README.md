@@ -1,4 +1,4 @@
-# QPC Desktop Application
+# QPG Desktop Application
 
 ## Installation
 

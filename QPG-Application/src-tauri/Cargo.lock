@@ -2949,7 +2949,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "qpc-application"
+name = "qpg-application"
 version = "0.1.0"
 dependencies = [
  "ollama-rs",

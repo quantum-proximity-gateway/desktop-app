@@ -72,8 +72,8 @@ function App() {
 
   return (
     <Box className="App" p={4} display="flex" flexDirection="column" height="100vh">
+      <Text fontSize="2xl" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
       <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
-        <Text fontSize="2xl" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
         <DrawerBackdrop />
         <DrawerTrigger asChild>
           <Button variant="outline" size="sm">
@@ -101,6 +101,7 @@ function App() {
               <Button variant="outline">Close</Button>
             </DrawerActionTrigger>
           </DrawerFooter>
+          <DrawerCloseTrigger />
         </DrawerContent>
       </DrawerRoot>
       <VStack align="stretch" flex="1">

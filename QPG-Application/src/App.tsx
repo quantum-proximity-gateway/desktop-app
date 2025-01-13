@@ -9,6 +9,7 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState([{sender: "", text: ""}]);
   const [chatID, setChatID] = useState("");
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
   
   async function listModels() {
     // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -28,8 +29,21 @@ function App() {
   }
 
   type ChatMessage = {
-    role: String,
+    role: string,
     content: string,
+  }
+
+  type Preferences = {
+    zoom: number,
+  };
+
+  async function fetchPreferences() {
+    try {
+      const prefs = await invoke<Preferences>("fetch_preferences");
+      setPreferences(prefs);
+    } catch (error) {
+      console.error("Failed to fetch preferences:", error);
+    }
   }
 
   async function generate() {
@@ -45,7 +59,6 @@ function App() {
     setMessages([...messages, userMessage, botMessage]);
   }
 
-
   function selectModel(model: string) {
     setSelectedModel(model);
     setChatID(model);
@@ -54,6 +67,7 @@ function App() {
 
   useEffect(() => { // runs once when the component is mounted
     listModels();
+    fetchPreferences();
   }, []);
 
   return (

@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
+use request::Client;
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
@@ -121,6 +122,31 @@ async fn generate(
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct Preferences {
+    ".qf1 2l;kalw mlkwam klm
+}
+
+#[tauri::command]
+async fn fetch_preferences() -> Result<Preferences, String> {
+    let api_url = "https://  {domain}  /devices/  {mac address}  /preferences";
+    let client = Client::new();
+
+    match client.get(api_url).send().await {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.json::<Preferences>().await {
+                    Ok(preferences) => Ok(preferences),
+                    Err(e) => Err(format!("Failed to parse preferences: {}", e)),
+                }
+            } else {
+                Err(format!("Failed to fetch preferences. Status: {}", response.status()))
+            }
+        }
+        Err(e) => Err(format!("HTTP request failed: {}", e)),
+    }
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -132,7 +158,7 @@ pub fn run() {
             Ollama::new_default_with_history(30),
         )))
         .manage(ChatIDs(TokioMutex::new(HashMap::new())))
-        .invoke_handler(tauri::generate_handler![list_models, generate])
+        .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
-use request::Client;
+use reqwest::Client;
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
@@ -124,12 +124,12 @@ async fn generate(
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Preferences {
-    ".qf1 2l;kalw mlkwam klm
+    zoom: f32,
 }
 
 #[tauri::command]
 async fn fetch_preferences() -> Result<Preferences, String> {
-    let api_url = "https://  {domain}  /devices/  {mac address}  /preferences";
+    let api_url = "https://{domain}/devices/{mac address}/preferences"; // Replace placeholders with actual values
     let client = Client::new();
 
     match client.get(api_url).send().await {
@@ -137,13 +137,20 @@ async fn fetch_preferences() -> Result<Preferences, String> {
             if response.status().is_success() {
                 match response.json::<Preferences>().await {
                     Ok(preferences) => Ok(preferences),
-                    Err(e) => Err(format!("Failed to parse preferences: {}", e)),
+                    Err(e) => {
+                        println!("Failed to parse preferences: {}", e);
+                        Ok(Preferences { zoom: 1.0 }) // Placeholder data
+                    }
                 }
             } else {
-                Err(format!("Failed to fetch preferences. Status: {}", response.status()))
+                println!("Failed to fetch preferences. Status: {}", response.status());
+                Ok(Preferences { zoom: 1.0 }) // Placeholder data
             }
         }
-        Err(e) => Err(format!("HTTP request failed: {}", e)),
+        Err(e) => {
+            println!("HTTP request failed: {}", e);
+            Ok(Preferences { zoom: 1.0 }) // Placeholder data
+        }
     }
 }
 

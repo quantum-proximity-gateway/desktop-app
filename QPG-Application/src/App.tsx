@@ -75,6 +75,16 @@ function App() {
     <Text fontSize="2xl" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
     <VStack align="stretch" flex="1">
       <Box>
+        <Text>Current Preferences:</Text>
+        {preferences ? (
+          <Box mt={2}>
+            <Text>Zoom: {preferences.zoom}</Text>
+          </Box>
+        ) : (
+          <Text>Loading preferences...</Text>
+        )}
+      </Box>
+      <Box>
         <Text>Avaliable models:</Text>
         <HStack mt={2}>
           {models.map((model, index) => (

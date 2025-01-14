@@ -130,12 +130,20 @@ struct Commands {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum DefaultValue {
+    Float(f32),
+    Bool(bool),
+    String(String),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct Setting {
     #[serde(default)]
     lower_bound: Option<f32>,
     #[serde(default)]
     upper_bound: Option<f32>,
-    default: f32,
+    default: DefaultValue,
     commands: Commands,
 }
 

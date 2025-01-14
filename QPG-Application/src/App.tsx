@@ -37,6 +37,23 @@ function App() {
     zoom: number;
   };
 
+  type Commands = {
+    windows: string;
+    macos: string;
+    gnome: string;
+  };
+
+  type DefaultValue = number | boolean | string;
+
+  type Settings = {
+    lower_bound?: number;
+    upper_bound?: number;
+    default: DefaultValue;
+    commands: Commands;
+  };
+
+  type AppConfig = Record<string, Settings>;
+
   async function fetchPreferences() {
     try {
       const prefs = await invoke<Preferences>("fetch_preferences");

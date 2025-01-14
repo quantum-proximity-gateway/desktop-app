@@ -122,34 +122,65 @@ async fn generate(
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Preferences {
-    zoom: f32,
+#[derive(Debug, Serialize, Deserialize)]
+struct Commands {
+    windows: String,
+    macos: String,
+    gnome: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Setting {
+    #[serde(default)]
+    lower_bound: Option<f32>,
+    #[serde(default)]
+    upper_bound: Option<f32>,
+    default: f32,
+    commands: Commands,
+}
+
+pub type AppConfig = HashMap<String, Setting>;
+
 #[tauri::command]
-async fn fetch_preferences() -> Result<Preferences, String> {
-    let api_url = "https://{domain}/devices/{mac address}/preferences"; // Replace placeholders with actual values
+async fn fetch_preferences() -> Result<AppConfig, String> {
+    use std::fs;
+    use serde_json;
+
+    fn load_default_app_config(path: &str) -> Result<AppConfig, Box<dyn std::error::Error>> {
+        let file_contents = fs::read_to_string(path)?;
+        let config: AppConfig = serde_json::from_str(&file_contents)?;
+        Ok(config)
+    }
+
+    let default_commands = match load_default_app_config("json_example.json") {
+        Ok(config) => config,
+        Err(e) => {
+            println!("Failed to load defaults: {}", e);
+            HashMap::new()
+        }
+    };
+
+    let api_url = "https://localhost:8000/devices/{username}/preferences"; // Replace placeholders with actual values
     let client = Client::new();
 
     match client.get(api_url).send().await {
         Ok(response) => {
             if response.status().is_success() {
-                match response.json::<Preferences>().await {
+                match response.json::<AppConfig>().await {
                     Ok(preferences) => Ok(preferences),
                     Err(e) => {
                         println!("Failed to parse preferences: {}", e);
-                        Ok(Preferences { zoom: 1.0 }) // Placeholder data
+                        Ok(default_commands) // Placeholder data
                     }
                 }
             } else {
                 println!("Failed to fetch preferences. Status: {}", response.status());
-                Ok(Preferences { zoom: 1.0 }) // Placeholder data
+                Ok(default_commands) // Placeholder data
             }
         }
         Err(e) => {
             println!("HTTP request failed: {}", e);
-            Ok(Preferences { zoom: 1.0 }) // Placeholder data
+            Ok(default_commands) // Placeholder data
         }
     }
 }
@@ -159,6 +190,28 @@ async fn fetch_preferences() -> Result<Preferences, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_autostart::MacosLauncher;
+                use tauri_plugin_autostart::ManagerExt;
+
+                app.handle().plugin(tauri_plugin_autostart::init(
+                    MacosLauncher::LaunchAgent,
+                    Some(vec!["--flag1", "--flag2"]),
+                ));
+
+                // Get the autostart manager
+                let autostart_manager = app.autolaunch();
+                // Enable autostart
+                let _ = autostart_manager.enable();
+                // Check enable state
+                println!("registered for autostart? {}", autostart_manager.is_enabled().unwrap());
+                // Disable autostart
+                let _ = autostart_manager.disable();
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(OllamaInstance(TokioMutex::new(

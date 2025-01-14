@@ -160,7 +160,7 @@ async fn fetch_preferences() -> Result<AppConfig, String> {
         Ok(config)
     }
 
-    let default_commands = match load_default_app_config("json_example.json") {
+    let default_commands = match load_default_app_config("src/json_example.json") {
         Ok(config) => config,
         Err(e) => {
             println!("Failed to load defaults: {}", e);

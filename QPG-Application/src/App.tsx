@@ -9,17 +9,12 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState([{ sender: "", text: "" }]);
   const [chatID, setChatID] = useState("");
-  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [preferences, setPreferences] = useState<AppConfig | null>(null);
   const [open, setOpen] = useState(false)
 
   async function listModels() {
     setModels(await invoke("list_models"));
   }
-
-  type Message = {
-    model: string;
-    prompt: string;
-  };
 
   type Response = {
     model: string;
@@ -31,10 +26,6 @@ function App() {
   type ChatMessage = {
     role: string;
     content: string;
-  };
-
-  type Preferences = {
-    zoom: number;
   };
 
   type Commands = {
@@ -56,7 +47,7 @@ function App() {
 
   async function fetchPreferences() {
     try {
-      const prefs = await invoke<Preferences>("fetch_preferences");
+      const prefs = await invoke<AppConfig>("fetch_preferences");
       setPreferences(prefs);
     } catch (error) {
       console.error("Failed to fetch preferences:", error);
@@ -104,10 +95,27 @@ function App() {
           <DrawerBody>
             {preferences ? (
               <>
-                <Text>Current Preferences:</Text>
-                <Box mt={2}>
-                  <Text>Zoom: {preferences.zoom}</Text>
-                </Box>
+                <Text fontWeight="bold" mb={2}>Current Preferences:</Text>
+                <VStack align="start">
+                  {Object.entries(preferences).map(([key, settings], index) => (
+                    <Box key={index} borderWidth="1px" borderRadius="md" p={4} width="100%">
+                      <Text fontWeight="bold" mb={1}>{key}</Text>
+                      <Text>Default: {settings.default.toString()}</Text>
+                      {settings.lower_bound !== undefined && (
+                        <Text>Lower Bound: {settings.lower_bound}</Text>
+                      )}
+                      {settings.upper_bound !== undefined && (
+                        <Text>Upper Bound: {settings.upper_bound}</Text>
+                      )}
+                      <Text>Commands:</Text>
+                      <VStack align="start" pl={4}>
+                        <Text>Windows: {settings.commands.windows}</Text>
+                        <Text>MacOS: {settings.commands.macos}</Text>
+                        <Text>GNOME: {settings.commands.gnome}</Text>
+                      </VStack>
+                    </Box>
+                  ))}
+                </VStack>
               </>
             ) : (
               <Text>Loading preferences...</Text>

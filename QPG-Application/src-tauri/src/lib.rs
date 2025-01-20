@@ -1,4 +1,5 @@
 use ollama_rs::generation::chat::MessageRole;
+use url::Url;
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
 use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,10 @@ struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
-    let ollama = Ollama::default();
+    let ollama = Ollama::new_with_history_from_url(
+        Url::parse("https://1372-31-205-125-227.ngrok-free.app").unwrap(),
+        50,
+    );
     let default_model_name = "granite-code:3b".to_string();
 
     let local_models = match ollama.list_local_models().await {

@@ -1,12 +1,5 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
-}
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Roboto', sans-serif; /* Updated font family */
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
@@ -30,15 +23,22 @@
   text-align: center;
 }
 
+header {
+  background-color: #003366; /* Dark blue for header */
+  padding: 1em;
+}
+
+footer {
+  background-color: #00509e; /* Lighter blue for footer */
+  padding: 1em;
+  color: white;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;
   will-change: filter;
   transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
 }
 
 .row {
@@ -54,10 +54,6 @@ a {
 
 a:hover {
   color: #535bf2;
-}
-
-h1 {
-  text-align: center;
 }
 
 input,
@@ -76,11 +72,15 @@ button {
 
 button {
   cursor: pointer;
+  background-color: #00509e; /* Button color */
+  color: white;
 }
 
 button:hover {
+  background-color: #003366; /* Darker blue on hover */
   border-color: #396cd8;
 }
+
 button:active {
   border-color: #396cd8;
   background-color: #e8e8e8;
@@ -89,10 +89,6 @@ button:active {
 input,
 button {
   outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
 }
 
 @media (prefers-color-scheme: dark) {

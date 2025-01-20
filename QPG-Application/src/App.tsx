@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import Header from "./components/Header";
 import "./App.css";
+import Footer from "./components/Footer";
 import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger } from "@chakra-ui/react";
 
 function App() {
@@ -80,7 +82,8 @@ function App() {
 
   return (
     <Box className="App" p={4} display="flex" flexDirection="column" height="100vh">
-      <Text fontSize="2xl" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
+      <Header />
+      <Text fontSize="3xl" fontWeight="bold" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
       <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
         <DrawerBackdrop />
         <DrawerTrigger asChild>
@@ -139,13 +142,13 @@ function App() {
           </HStack>
           <Text mt={2}>Selected model: {selectedModel}</Text>
         </Box>
-        <Box mb={4}>
-          <Text fontSize="lg" textAlign="center">Example Prompts:</Text>
-          <Text textAlign="center">“The text is too small, please make it bigger.”</Text>
-          <Text textAlign="center">“Can you change the font style to ...?”</Text>
-          <Text textAlign="center">“I need a larger cursor for better visibility.”</Text>
-          <Text textAlign="center">“Please adjust the zoom for better readability.”</Text>
-          <Text textAlign="center">“Could you disable animations please?”</Text>
+        <Box className="container" mb={4}>
+          <Text fontSize="lg">Example Prompts:</Text>
+          <Text>“The text is too small, please make it bigger.”</Text>
+          <Text>“Can you change the font style to ...?”</Text>
+          <Text>“I need a larger cursor for better visibility.”</Text>
+          <Text>“Please adjust the zoom for better readability.”</Text>
+          <Text>“Could you disable animations please?”</Text>
         </Box>
         <Box border="1px" borderColor="gray.200" borderRadius="md" p={4} h="400px" overflowY="scroll" flex="1">
           {messages.map((message, index) => (
@@ -158,6 +161,7 @@ function App() {
           <Input placeholder="Type your prompt:" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
           <Button onClick={generate}>Send</Button>
         </HStack>
+        <Footer />
       </VStack>
     </Box>
   );

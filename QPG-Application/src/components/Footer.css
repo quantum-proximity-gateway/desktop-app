@@ -1,0 +1,21 @@
+.footer {
+    padding: 10px; /* Reduced padding for a smaller footer */
+    text-align: center;
+    background: linear-gradient(90deg, #00509e, #003366); /* Consistent background */
+}
+
+.footer-text {
+    color: white;
+    font-size: 12px; /* Smaller font size */
+    font-weight: bold;
+}
+
+.footer-link {
+    color: white;
+    text-decoration: none;
+    font-size: 12px; /* Smaller font size for links */
+}
+
+.footer-link:hover {
+    text-decoration: underline; /* Hover effect for links */
+}

@@ -2,44 +2,43 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(90deg, #00509e, #003366); /* New vibrant gradient */
-  padding: 5px; /* Reduced padding for a smaller header */
+  background: linear-gradient(90deg, #00509e, #003366); 
+  padding: 5px; 
 }
 
 .logo {
-  font-size: 32px; /* Increased font size for better visibility */
+  font-size: 32px; 
   color: white;
   font-weight: bold;
-  font-family: 'Roboto', sans-serif; /* Updated font family */
-  margin-bottom: 10px; /* Spacing below the logo */
+  font-family: 'Roboto', sans-serif; 
+  margin-bottom: 10px; 
 }
 
 .nav-links {
   list-style: none;
   display: flex;
-  gap: 30px; /* Increased gap for better spacing */
+  gap: 30px; 
 }
 
 .nav-links a {
   color: white;
   text-decoration: none;
-  font-size: 18px; /* Increased font size for links */
-  transition: color 0.3s, transform 0.3s; /* Added transform for hover effect */
+  font-size: 18px; 
+  transition: color 0.3s, transform 0.3s; 
 }
 
 .nav-links a:hover {
-  color: #D12771; /* Accent color */
-  transform: scale(1.1); /* Slightly enlarge on hover */
+  color: #D12771; 
+  transform: scale(1.1); 
 }
 
-/* Responsive Styles */
 @media (max-width: 768px) {
   .header {
-    flex-direction: column; /* Stack elements vertically on mobile */
+    flex-direction: column; 
   }
 
   .nav-links {
-    flex-direction: column; /* Stack links vertically on mobile */
-    gap: 10px; /* Reduced gap for mobile */
+    flex-direction: column; 
+    gap: 10px; 
   }
 }

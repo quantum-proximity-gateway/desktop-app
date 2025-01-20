@@ -83,7 +83,7 @@ function App() {
   return (
     <Box className="App" p={4} display="flex" flexDirection="column" height="100vh">
       <Header />
-      <Text fontSize="3xl" fontWeight="bold" textAlign="center" mb={4}>Quantum Proximity Gateway - Preferences AI Agent</Text>
+      <Text fontSize="4xl" fontWeight="bold" textAlign="center" mt={8} mb={8}>Quantum Proximity Gateway - Preferences AI Agent</Text>
       <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
         <DrawerBackdrop />
         <DrawerTrigger asChild>
@@ -134,15 +134,15 @@ function App() {
       </DrawerRoot>
       <VStack align="stretch" flex="1">
         <Box>
-          <Text>Available models:</Text>
-          <HStack mt={2}>
+          <Text mt={3} mb={1}>Available models:</Text>
+          <HStack mt={1}>
             {models.map((model, index) => (
               <Button key={index} onClick={() => selectModel(model)}>{model}</Button>
             ))}
           </HStack>
-          <Text mt={2}>Selected model: {selectedModel}</Text>
+          <Text mt={1}>Selected model: {selectedModel}</Text>
         </Box>
-        <Box className="container" mb={4}>
+        <Box className="container" mb={19}>
           <Text fontSize="lg">Example Prompts:</Text>
           <Text>“The text is too small, please make it bigger.”</Text>
           <Text>“Can you change the font style to ...?”</Text>

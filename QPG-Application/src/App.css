@@ -1,5 +1,5 @@
 :root {
-  font-family: 'Roboto', sans-serif; /* Updated font family */
+  font-family: 'Roboto', sans-serif; 
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
@@ -24,12 +24,12 @@
 }
 
 header {
-  background-color: #003366; /* Dark blue for header */
+  background-color: #003366; 
   padding: 1em;
 }
 
 footer {
-  background-color: #00509e; /* Lighter blue for footer */
+  background-color: #00509e; 
   padding: 1em;
   color: white;
 }
@@ -72,12 +72,12 @@ button {
 
 button {
   cursor: pointer;
-  background-color: #00509e; /* Button color */
+  background-color: #00509e; 
   color: white;
 }
 
 button:hover {
-  background-color: #003366; /* Darker blue on hover */
+  background-color: #003366; 
   border-color: #396cd8;
 }
 

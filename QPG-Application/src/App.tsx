@@ -139,6 +139,14 @@ function App() {
           </HStack>
           <Text mt={2}>Selected model: {selectedModel}</Text>
         </Box>
+        <Box mb={4}>
+          <Text fontSize="lg" textAlign="center">Example Prompts:</Text>
+          <Text textAlign="center">“The text is too small, please make it bigger.”</Text>
+          <Text textAlign="center">“Can you change the font style to ...?”</Text>
+          <Text textAlign="center">“I need a larger cursor for better visibility.”</Text>
+          <Text textAlign="center">“Please adjust the zoom for better readability.”</Text>
+          <Text textAlign="center">“Could you disable animations please?”</Text>
+        </Box>
         <Box border="1px" borderColor="gray.200" borderRadius="md" p={4} h="400px" overflowY="scroll" flex="1">
           {messages.map((message, index) => (
             <Box key={index} mb={2} textAlign={message.sender === "user" ? "right" : "left"}>

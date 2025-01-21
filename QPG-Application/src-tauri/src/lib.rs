@@ -15,10 +15,10 @@ struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
     let ollama = Ollama::new_with_history_from_url(
-        Url::parse("https://1372-31-205-125-227.ngrok-free.app").unwrap(),
+        Url::parse("https://3d0c-144-82-8-251.ngrok-free.app").unwrap(),
         50,
     );
-    let default_model_name = "granite-code:3b".to_string();
+    let default_model_name = "granite3-dense:8b".to_string();
 
     let local_models = match ollama.list_local_models().await {
         Ok(res) => res,
@@ -244,7 +244,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(OllamaInstance(TokioMutex::new(
-            Ollama::new_default_with_history(30),
+	    Ollama::new_with_history_from_url(
+	        Url::parse("https://3d0c-144-82-8-251.ngrok-free.app").unwrap(),
+                50,
+            )
         )))
         .manage(ChatIDs(TokioMutex::new(HashMap::new())))
         .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences])

@@ -97,8 +97,10 @@ async fn generate(
                 Ok(parsed_response) => {
                     // execute shell command https://v2.tauri.app/plugin/shell/
                     let shell = app_handle.shell();
-                    match shell.command(parsed_response.command.clone()).output().await // so unsafe we need to whitelist only gsettings
-                        {
+
+		    let command_parts: Vec<&str> = parsed_response.command.split_whitespace().collect();
+		    if let Some((command, args)) = command_parts.split_first() {
+		        match shell.command(command).args(args).output().await { // so unsafe we need to whitelist only gsettings
                             Ok(output) => {
                                 if output.status.success() {
                                     println!("Command result: {:?}", String::from_utf8(output.stdout));
@@ -110,6 +112,21 @@ async fn generate(
                                 println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
                             }
                         }
+		    } else {
+		        match shell.command(parsed_response.command.clone()).output().await { // so unsafe we need to whitelist only gsettings
+                            Ok(output) => {
+                                if output.status.success() {
+                                    println!("Command result: {:?}", String::from_utf8(output.stdout));
+                                } else {
+                                    println!("Exit with code: {}", output.status.code().unwrap());
+                                }
+                            }
+                            Err(e) => {
+                                println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
+                            }
+                        }
+		    }
+		    
                     // we will need to save new command settings here
                     println!("Command executed: {}", parsed_response.command);
                     res.message = Some(ChatMessage::new(

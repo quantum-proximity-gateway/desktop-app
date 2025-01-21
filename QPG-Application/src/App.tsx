@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner } from "@chakra-ui/react";
+import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Image } from "@chakra-ui/react";
 
 function App() {
   const [models, setModels] = useState([]);
@@ -70,6 +70,9 @@ function App() {
   }
 
   async function generate() {
+    if (isLoading || !prompt) { 
+      return;
+    }
     if (!selectedModel) {
       alert("Please select a model first");
       return;
@@ -89,6 +92,7 @@ function App() {
     setChatID(model);
     setMessages([{ sender: "", text: "" }]);
   }
+
 
   useEffect(() => {
     listModels();
@@ -200,7 +204,14 @@ function App() {
               </Box>)}
           </Box>
           <HStack mt={4}>
-            <Input placeholder="Type your prompt:" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+            <Input onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    generate();
+                  }
+                }} 
+                placeholder="Type your prompt:" 
+                value={prompt} 
+                onChange={(e) => setPrompt(e.target.value)} />
             <Button onClick={generate}>Send</Button>
           </HStack>
         </VStack>

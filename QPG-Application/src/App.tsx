@@ -91,6 +91,7 @@ function App() {
     setSelectedModel(model);
     setChatID(model);
     setMessages([{ sender: "", text: "" }]);
+    setIsLoading(false);
   }
 
 
@@ -181,15 +182,14 @@ function App() {
             <DrawerCloseTrigger />
           </DrawerContent>
         </DrawerRoot>
-        <VStack align="stretch" flex="1">
+        <VStack align="stretch" flex="1" mt={4}>
           <Box>
             <Text>Available models:</Text>
             <HStack mt={2}>
-              {models.map((model, index) => (
-                <Button key={index} onClick={() => selectModel(model) }>{model}</Button>
+              {models.sort().map((model, index) => (
+                <Button key={index} onClick={() => selectModel(model) } bg={selectedModel == model ? "gray.400": "white"}>{model}</Button>
               ))}
             </HStack>
-            <Text mt={2}>Selected model: {selectedModel}</Text>
           </Box>
           <Box border="1px" borderColor="gray.200" borderRadius="md" p={4} h="400px" overflowY="scroll" flex="1">
             {messages.map((message, index) => (

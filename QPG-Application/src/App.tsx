@@ -133,11 +133,12 @@ function App() {
       )}
       {!showWelcome && (
         <Box className="App fadeIn" p={4} display="flex" flexDirection="column" height="100vh">
-        <Text fontSize="2xl" textAlign="center" mb={4}>IBM Proximity Agents</Text>
+        <Text fontSize="2xl" textAlign="center" mb={4}>IBM Proximity Agents - Accessibility Preferences</Text>
+        <Flex direction="row" justify="center" align="center" mb={4} gap={50}>
         <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
           <DrawerBackdrop />
           <DrawerTrigger asChild>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" minWidth="15%">
               Preferences
             </Button>
           </DrawerTrigger>
@@ -182,12 +183,16 @@ function App() {
             <DrawerCloseTrigger />
           </DrawerContent>
         </DrawerRoot>
+        <Button variant="outline" size="sm" minWidth="15%">
+            Switch Proximity Agent
+        </Button>
+        </Flex>
         <VStack align="stretch" flex="1" mt={4}>
           <Box>
-            <Text>Available models:</Text>
-            <HStack mt={2}>
+            <Text fontSize="xl" textAlign="center">Available models</Text>
+            <HStack mt={2} justifyContent="center">
               {models.sort().map((model, index) => (
-                <Button key={index} onClick={() => selectModel(model) } bg={selectedModel == model ? "gray.400": "white"}>{model}</Button>
+                <Button key={index} onClick={() => selectModel(model) } bg={selectedModel == model ? "gray.400": "white"} minWidth={`${75 / models.length}%`}>{model}</Button>
               ))}
             </HStack>
           </Box>

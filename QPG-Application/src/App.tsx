@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex } from "@chakra-ui/react";
+import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner } from "@chakra-ui/react";
 
 function App() {
   const [models, setModels] = useState([]);
@@ -13,6 +13,7 @@ function App() {
   const [open, setOpen] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true);
   const [isFading, setIsFading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -76,9 +77,11 @@ function App() {
     const userMessage = { sender: "user", text: prompt };
     setMessages([...messages, userMessage]);
     setPrompt("");
+    setIsLoading(true);
     const response: Response = await invoke("generate", { request: { model: selectedModel, prompt, chat_id: chatID } });
     const botMessage = { sender: "bot", text: response.message.content };
     setMessages([...messages, userMessage, botMessage]);
+    setIsLoading(false);
   }
 
   function selectModel(model: string) {
@@ -190,6 +193,11 @@ function App() {
                 <Text fontWeight={message.sender === "user" ? "bold" : "normal"}>{message.text}</Text>
               </Box>
             ))}
+            {isLoading && (
+              <Box textAlign="center">
+                <Spinner size="sm"/>
+                <Text>Generating response...</Text>
+              </Box>)}
           </Box>
           <HStack mt={4}>
             <Input placeholder="Type your prompt:" value={prompt} onChange={(e) => setPrompt(e.target.value)} />

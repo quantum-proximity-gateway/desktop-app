@@ -120,12 +120,12 @@ function App() {
         className={isFading ? 'fadeOut' : 'fadeIn'}
         fontFamily="IBM Plex Sans, sans-serif"
         >
-        <Text fontSize="2xl" textAlign="center">IBM Proximity Gateway</Text>
+        <Text fontSize="2xl" textAlign="center">IBM Proximity Agents</Text>
         </Flex>
       )}
       {!showWelcome && (
         <Box className="App fadeIn" p={4} display="flex" flexDirection="column" height="100vh">
-        <Text fontSize="2xl" textAlign="center" mb={4}>IBM Proximity Gateway</Text>
+        <Text fontSize="2xl" textAlign="center" mb={4}>IBM Proximity Agents</Text>
         <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
           <DrawerBackdrop />
           <DrawerTrigger asChild>

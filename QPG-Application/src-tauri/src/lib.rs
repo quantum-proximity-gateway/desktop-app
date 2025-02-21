@@ -4,6 +4,7 @@ use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, Chat
 use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
@@ -15,7 +16,7 @@ struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
     let ollama = Ollama::new_with_history_from_url(
-        Url::parse("https://3d0c-144-82-8-251.ngrok-free.app").unwrap(),
+        Url::parse("https://0b53-31-205-125-243.ngrok-free.app").unwrap(),
         50,
     );
     let default_model_name = "granite3-dense:8b".to_string();
@@ -69,15 +70,37 @@ async fn generate(
     app_handle: tauri::AppHandle
 ) -> Result<ChatMessageResponse, String> {
     println!("Generating response for {:?}", request);
+
+    let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+
+    let sys_prompt = format!(
+	r#""You're an assistant that only replies in JSON format with keys "message" and "command".
+It is very important that you stick to the following JSON format.
+
+Your main job is to act as a computer accessibility coach that will reply to queries with a JSON
+that has the following keys:
+- "message": Something you want to say to the user
+- "command": A gsettings accessibility command to run
+
+Below is a reference JSON that shows possible accessibility commands for GNOME:
+
+{}
+
+Use this reference to inform your responses if needed. However, always reply
+with just the final JSON object, like:
+
+{{
+  "message": "...",
+  "command": "..."
+}}"#, json_example);
+    
     let mut ollama = g_ollama.0.lock().await;
     let mut seen_chats = seen_chats.0.lock().await;
-
+    
     if !seen_chats.contains_key(&request.chat_id) {
         seen_chats.insert(request.chat_id.clone(), true);
         if let Err(e) = ollama.send_chat_messages_with_history(
-            ChatMessageRequest::new(request.model.clone(), vec![ChatMessage::system(r#"You're an assistant that only replies in JSON format which contain gsettings command and a message, it is very important that you stick to the following JSON format. 
-            Your main job is to act as a computer accessibility coach that will reply to queries with a JSON with the following keys: 'message'(Something you want to say to the user), 
-            'command'(a gsettings accessibility command to run)."#.to_string())]),
+            ChatMessageRequest::new(request.model.clone(), vec![ChatMessage::system(sys_prompt)]),
             request.chat_id.clone()).await {
             return Err(format!("Failed to send initial chat message: {}", e));
         }
@@ -92,7 +115,8 @@ async fn generate(
     {
         Ok(mut res) => {
             println!("Received initial response: {:?}", res);
-            let response = res.message.unwrap().content;
+            // let response = res.message.unwrap().content;
+	    let response = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
             match parse_model_response(response) {
                 Ok(parsed_response) => {
                     // execute shell command https://v2.tauri.app/plugin/shell/
@@ -245,7 +269,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(OllamaInstance(TokioMutex::new(
 	    Ollama::new_with_history_from_url(
-	        Url::parse("https://3d0c-144-82-8-251.ngrok-free.app").unwrap(),
+	        Url::parse("https://0b53-31-205-125-243.ngrok-free.app").unwrap(),
                 50,
             )
         )))

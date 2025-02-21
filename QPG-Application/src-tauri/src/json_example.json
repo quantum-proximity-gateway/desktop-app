@@ -54,17 +54,6 @@
       "gnome": "gsettings set org.gnome.desktop.a11y.magnifier mag-factor"
     }
   },
-  "high_contrast": {
-    "lower_bound": null,
-    "upper_bound": null,
-    "default": false,
-    "current": false,
-    "commands": {
-      "windows": "",
-      "macos": "",
-      "gnome": "gsettings set org.gnome.desktop.interface high-contrast"
-    }
-  },
   "locate_pointer": {
     "lower_bound": null,
     "upper_bound": null,

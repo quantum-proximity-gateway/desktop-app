@@ -62,5 +62,29 @@
             "macos": "",
             "gnome": "gsettings set org.gnome.desktop.interface locate-pointer"
         }
+    },
+    "on_screen_keyboard": {
+        "default": false,
+        "commands": {
+            "windows": "",
+            "macos": "",
+            "gnome": "gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled"
+        }
+    },
+    "screen_reader": {
+        "default": false,
+        "commands": {
+            "windows": "",
+            "macos": "",
+            "gnome": "gsettings set org.gnome.desktop.a11y.applications screen-reader-enabled"
+        }
+    },
+    "high_contrast": {
+        "default": false,
+        "commands": {
+            "windows": "",
+            "macos": "",
+            "gnome": "gsettings set org.gnome.desktop.interface high-contrast"
+        }
     }
 }

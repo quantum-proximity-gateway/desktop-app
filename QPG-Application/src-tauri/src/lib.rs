@@ -10,13 +10,15 @@ use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 
+const OLLAMA_BASE_URL: &str = "https://0b53-31-205-125-243.ngrok-free.app";
+
 struct OllamaInstance(TokioMutex<Ollama>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
     let ollama = Ollama::new_with_history_from_url(
-        Url::parse("https://0b53-31-205-125-243.ngrok-free.app").unwrap(),
+        Url::parse(OLLAMA_BASE_URL).unwrap(),
         50,
     );
     let default_model_name = "granite3-dense:8b".to_string();
@@ -122,12 +124,31 @@ with just the final JSON object, like:
                     // execute shell command https://v2.tauri.app/plugin/shell/
                     let shell = app_handle.shell();
 
+		    let command_str = parsed_response.command.clone();
+		    println!("Attempting to run shell command: {}", command_str);
+
 		    let command_parts: Vec<&str> = parsed_response.command.split_whitespace().collect();
 		    if let Some((command, args)) = command_parts.split_first() {
 		        match shell.command(command).args(args).output().await { // so unsafe we need to whitelist only gsettings
                             Ok(output) => {
                                 if output.status.success() {
-                                    println!("Command result: {:?}", String::from_utf8(output.stdout));
+				    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+                                    println!("Command result: {:?}", stdout_str);
+
+				    if !args.is_empty() {
+					let new_value_str = args.last().unwrap().to_string();
+					let base_command_str = {
+                                            let without_last = &args[..args.len() - 1];
+                                            format!("{} {}", command, without_last.join(" "))
+                                        };
+
+					update_json_current_value(
+					    &json_example,
+					    "src/json_example.json",
+					    &base_command_str,
+					    &new_value_str,
+					);
+				    }
                                 } else {
                                     println!("Exit with code: {}", output.status.code().unwrap());
                                 }
@@ -167,6 +188,70 @@ with just the final JSON object, like:
     }
 }
 
+fn update_json_current_value(
+    old_json_str: &str,
+    json_file_path: &str,
+    base_command: &str,
+    new_value_str: &str,
+) {
+    let mut config: AppConfig = match serde_json::from_str(old_json_str) {
+	Ok(cfg) => cfg,
+	Err(e) => {
+	    println!("Could not parse existing JSON: {:?}", e);
+	    return;
+	}
+    };
+
+    let mut found_match = false;
+
+    for (key, setting) in config.iter_mut() {
+	if setting.commands.gnome.trim() == base_command.trim() {
+	    let new_val: DefaultValue = parse_new_value(new_value_str, &setting.default);
+	    setting.current = Some(new_val);
+
+	    found_match = true;
+	    println!("Updated '{}': current is now '{}'", key, new_value_str);
+            break;
+	}
+    }
+
+    if !found_match {
+	println!("No command exists for: {}", base_command);
+        return;
+    }
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(updated_json_str) => {
+            if let Err(e) = fs::write(json_file_path, updated_json_str) {
+                println!("Failed to write updated JSON file: {}", e);
+            } else {
+                println!("Successfully updated JSON file.");
+            }
+        }
+        Err(e) => println!("Failed to serialize updated config: {}", e),
+    }
+}
+
+fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultValue {
+    match default_val {
+        DefaultValue::Bool(_) => {
+            if let Ok(b) = new_value_str.parse::<bool>() {
+                return DefaultValue::Bool(b);
+            }
+            DefaultValue::String(new_value_str.to_string())
+        }
+        DefaultValue::Float(_) => {
+            if let Ok(f) = new_value_str.parse::<f32>() {
+                return DefaultValue::Float(f);
+            }
+            DefaultValue::String(new_value_str.to_string())
+        }
+        DefaultValue::String(_) => {
+            DefaultValue::String(new_value_str.to_string())
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Commands {
     windows: String,
@@ -189,6 +274,8 @@ struct Setting {
     #[serde(default)]
     upper_bound: Option<f32>,
     default: DefaultValue,
+    #[serde(default)]
+    current: Option<DefaultValue>,
     commands: Commands,
 }
 
@@ -269,7 +356,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(OllamaInstance(TokioMutex::new(
 	    Ollama::new_with_history_from_url(
-	        Url::parse("https://0b53-31-205-125-243.ngrok-free.app").unwrap(),
+	        Url::parse(OLLAMA_BASE_URL).unwrap(),
                 50,
             )
         )))

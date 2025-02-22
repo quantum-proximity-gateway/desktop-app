@@ -10,13 +10,15 @@ use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 
+const OLLAMA_BASE_URL: &str = "https://0b53-31-205-125-243.ngrok-free.app";
+
 struct OllamaInstance(TokioMutex<Ollama>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 
 #[tauri::command]
 async fn list_models() -> Result<Vec<String>, String> {
     let ollama = Ollama::new_with_history_from_url(
-        Url::parse("https://0b53-31-205-125-243.ngrok-free.app").unwrap(),
+        Url::parse(OLLAMA_BASE_URL).unwrap(),
         50,
     );
     let default_model_name = "granite3-dense:8b".to_string();
@@ -67,6 +69,194 @@ struct GenerateResult {
     ollama_response: ChatMessageResponse,
     command: Option<String>,
 }
+
+// #[tauri::command]
+// async fn generate(
+//     request: ChatRequest,
+//     g_ollama: State<'_, OllamaInstance>,
+//     seen_chats: State<'_, ChatIDs>,
+//     app_handle: tauri::AppHandle
+// ) -> Result<ChatMessageResponse, String> {
+//     println!("Generating response for {:?}", request);
+
+//     let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+
+//     let sys_prompt = format!(
+// 	r#""You're an assistant that only replies in JSON format with keys "message" and "command".
+// It is very important that you stick to the following JSON format.
+
+// Your main job is to act as a computer accessibility coach that will reply to queries with a JSON
+// that has the following keys:
+// - "message": Something you want to say to the user
+// - "command": A gsettings accessibility command to run
+
+// Below is a reference JSON that shows possible accessibility commands for GNOME:
+
+// {}
+
+// Use this reference to inform your responses if needed. However, always reply
+// with just the final JSON object, like:
+
+// {{
+//   "message": "...",
+//   "command": "..."
+// }}"#, json_example);
+    
+//     let mut ollama = g_ollama.0.lock().await;
+//     let mut seen_chats = seen_chats.0.lock().await;
+    
+//     if !seen_chats.contains_key(&request.chat_id) {
+//         seen_chats.insert(request.chat_id.clone(), true);
+//         if let Err(e) = ollama.send_chat_messages_with_history(
+//             ChatMessageRequest::new(request.model.clone(), vec![ChatMessage::system(sys_prompt)]),
+//             request.chat_id.clone()).await {
+//             return Err(format!("Failed to send initial chat message: {}", e));
+//         }
+//     }
+
+//     match ollama
+//         .send_chat_messages_with_history(
+//             ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
+//             request.chat_id,
+//         )
+//         .await
+//     {
+//         Ok(mut res) => {
+//             println!("Received initial response: {:?}", res);
+//             // let response = res.message.unwrap().content;
+// 	    let response = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
+//             match parse_model_response(response) {
+//                 Ok(parsed_response) => {
+//                     // execute shell command https://v2.tauri.app/plugin/shell/
+//                     let shell = app_handle.shell();
+
+// 		    let command_str = parsed_response.command.clone();
+// 		    println!("Attempting to run shell command: {}", command_str);
+
+// 		    let command_parts: Vec<&str> = parsed_response.command.split_whitespace().collect();
+// 		    if let Some((command, args)) = command_parts.split_first() {
+// 		        match shell.command(command).args(args).output().await { // so unsafe we need to whitelist only gsettings
+//                             Ok(output) => {
+//                                 if output.status.success() {
+// 				    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+//                                     println!("Command result: {:?}", stdout_str);
+
+// 				    if !args.is_empty() {
+// 					let new_value_str = args.last().unwrap().to_string();
+// 					let base_command_str = {
+//                                             let without_last = &args[..args.len() - 1];
+//                                             format!("{} {}", command, without_last.join(" "))
+//                                         };
+
+// 					update_json_current_value(
+// 					    &json_example,
+// 					    "src/json_example.json",
+// 					    &base_command_str,
+// 					    &new_value_str,
+// 					);
+// 				    }
+//                                 } else {
+//                                     println!("Exit with code: {}", output.status.code().unwrap());
+//                                 }
+//                             }
+//                             Err(e) => {
+//                                 println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
+//                             }
+//                         }
+// 		    } else {
+// 		        match shell.command(parsed_response.command.clone()).output().await { // so unsafe we need to whitelist only gsettings
+//                             Ok(output) => {
+//                                 if output.status.success() {
+//                                     println!("Command result: {:?}", String::from_utf8(output.stdout));
+//                                 } else {
+//                                     println!("Exit with code: {}", output.status.code().unwrap());
+//                                 }
+//                             }
+//                             Err(e) => {
+//                                 println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
+//                             }
+//                         }
+// 		    }
+		    
+//                     // we will need to save new command settings here
+//                     println!("Command executed: {}", parsed_response.command);
+//                     res.message = Some(ChatMessage::new(
+//                         MessageRole::Assistant,
+//                         parsed_response.message,
+//                     ));
+//                     println!("Model Response: {:?}", res);
+//                     Ok(res)
+//                 }
+//                 Err(e) => Err(format!("Failed to parse model response: {}", e)),
+//             }
+//         }
+//         Err(e) => Err(format!("Failed to generate text: {}", e)),
+//     }
+// }
+
+// fn update_json_current_value(
+//     old_json_str: &str,
+//     json_file_path: &str,
+//     base_command: &str,
+//     new_value_str: &str,
+// ) {
+//     let mut config: AppConfig = match serde_json::from_str(old_json_str) {
+// 	Ok(cfg) => cfg,
+// 	Err(e) => {
+// 	    println!("Could not parse existing JSON: {:?}", e);
+// 	    return;
+// 	}
+//     };
+
+//     let mut found_match = false;
+
+//     for (key, setting) in config.iter_mut() {
+// 	if setting.commands.gnome.trim() == base_command.trim() {
+// 	    let new_val: DefaultValue = parse_new_value(new_value_str, &setting.default);
+// 	    setting.current = Some(new_val);
+
+// 	    found_match = true;
+// 	    println!("Updated '{}': current is now '{}'", key, new_value_str);
+//             break;
+// 	}
+//     }
+
+//     if !found_match {
+// 	println!("No command exists for: {}", base_command);
+//         return;
+//     }
+
+//     match serde_json::to_string_pretty(&config) {
+//         Ok(updated_json_str) => {
+//             if let Err(e) = fs::write(json_file_path, updated_json_str) {
+//                 println!("Failed to write updated JSON file: {}", e);
+//             } else {
+//                 println!("Successfully updated JSON file.");
+//             }
+//         }
+//         Err(e) => println!("Failed to serialize updated config: {}", e),
+//     }
+// }
+
+// fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultValue {
+//     match default_val {
+//         DefaultValue::Bool(_) => {
+//             if let Ok(b) = new_value_str.parse::<bool>() {
+//                 return DefaultValue::Bool(b);
+//             }
+//             DefaultValue::String(new_value_str.to_string())
+//         }
+//         DefaultValue::Float(_) => {
+//             if let Ok(f) = new_value_str.parse::<f32>() {
+//                 return DefaultValue::Float(f);
+//             }
+//             DefaultValue::String(new_value_str.to_string())
+//         }
+//         DefaultValue::String(_) => {
+//             DefaultValue::String(new_value_str.to_string())
+//         }
+//     }
+// }
 
 #[tauri::command]
 async fn generate(
@@ -162,6 +352,7 @@ async fn execute_command(
     Ok(())
 }
 
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Commands {
     windows: String,
@@ -184,6 +375,8 @@ struct Setting {
     #[serde(default)]
     upper_bound: Option<f32>,
     default: DefaultValue,
+    #[serde(default)]
+    current: Option<DefaultValue>,
     commands: Commands,
 }
 
@@ -264,7 +457,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(OllamaInstance(TokioMutex::new(
 	    Ollama::new_with_history_from_url(
-	        Url::parse("https://0b53-31-205-125-243.ngrok-free.app").unwrap(),
+	        Url::parse(OLLAMA_BASE_URL).unwrap(),
                 50,
             )
         )))

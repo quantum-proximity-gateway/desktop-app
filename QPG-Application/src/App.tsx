@@ -163,6 +163,37 @@ function App() {
       )}
       {!showWelcome && (
         <Box className="App fadeIn" p={4} display="flex" flexDirection="column" height="100vh">
+        <Modal isOpen={!!pendingCommand} onClose={() => setPendingCommand(null)}>
+          <ModalOverlay />
+            <ModalContent>
+              <Box bg="gray.400">
+              <ModalHeader>Confirm Command Execution</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                <Text>Run this command?</Text>
+                <Code p={2} my={2} display="block">{pendingCommand}</Code>
+                <Text>This will modify your system settings.</Text>
+              </ModalBody>
+              <ModalFooter>
+                <Button mr={3} onClick={() => setPendingCommand(null)}>
+                  Cancel
+                </Button>
+                <Button colorScheme="blue" onClick={async () => {
+                  if (pendingCommand) {
+                    try {
+                      await invoke("execute_command", { command: pendingCommand });
+                    } catch (error) {
+                      alert(`Error: ${error}`);
+                    }
+                    setPendingCommand(null);
+                  }
+                }}>
+                  Execute
+                </Button>
+              </ModalFooter>
+            </Box>
+            </ModalContent>
+        </Modal>
         <Text fontSize="2xl" textAlign="center" mb={4}>IBM Proximity Agents - Accessibility Preferences</Text>
         <Flex direction="row" justify="center" align="center" mb={4} gap={50}>
         <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
@@ -217,35 +248,6 @@ function App() {
             Switch Proximity Agent
         </Button>
         </Flex>
-        <Modal isOpen={!!pendingCommand} onClose={() => setPendingCommand(null)}>
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Confirm Command Execution</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <Text>Run this command?</Text>
-              <Code p={2} my={2} display="block">{pendingCommand}</Code>
-              <Text>This will modify your system settings.</Text>
-            </ModalBody>
-            <ModalFooter>
-              <Button mr={3} onClick={() => setPendingCommand(null)}>
-                Cancel
-              </Button>
-              <Button colorScheme="blue" onClick={async () => {
-                if (pendingCommand) {
-                  try {
-                    await invoke("execute_command", { command: pendingCommand });
-                  } catch (error) {
-                    alert(`Error: ${error}`);
-                  }
-                  setPendingCommand(null);
-                }
-              }}>
-                Execute
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
         <VStack align="stretch" flex="1" mt={4}>
           <Box>
             <Text fontSize="xl" textAlign="center">Available models</Text>

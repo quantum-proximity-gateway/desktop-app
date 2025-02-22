@@ -62,13 +62,18 @@ fn parse_model_response(json_str: String) -> Result<ModelResponse, serde_json::E
     Ok(parsed_response)
 }
 
+#[derive(Serialize)]
+struct GenerateResult {
+    ollama_response: ChatMessageResponse,
+    command: Option<String>,
+}
+
 #[tauri::command]
 async fn generate(
     request: ChatRequest,
     g_ollama: State<'_, OllamaInstance>,
     seen_chats: State<'_, ChatIDs>,
-    app_handle: tauri::AppHandle
-) -> Result<ChatMessageResponse, String> {
+) -> Result<GenerateResult, String> {
     println!("Generating response for {:?}", request);
 
     let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
@@ -106,6 +111,65 @@ with just the final JSON object, like:
         }
     }
 
+    // match ollama
+    //     .send_chat_messages_with_history(
+    //         ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
+    //         request.chat_id,
+    //     )
+    //     .await
+    // {
+    //     Ok(mut res) => {
+    //         println!("Received initial response: {:?}", res);
+    //         // let response = res.message.unwrap().content;
+	//     let response = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
+    //         match parse_model_response(response) {
+    //             Ok(parsed_response) => {
+    //                 // execute shell command https://v2.tauri.app/plugin/shell/
+    //                 let shell = app_handle.shell();
+
+	// 	    let command_parts: Vec<&str> = parsed_response.command.split_whitespace().collect();
+	// 	    if let Some((command, args)) = command_parts.split_first() {
+	// 	        match shell.command(command).args(args).output().await { // so unsafe we need to whitelist only gsettings
+    //                         Ok(output) => {
+    //                             if output.status.success() {
+    //                                 println!("Command result: {:?}", String::from_utf8(output.stdout));
+    //                             } else {
+    //                                 println!("Exit with code: {}", output.status.code().unwrap());
+    //                             }
+    //                         }
+    //                         Err(e) => {
+    //                             println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
+    //                         }
+    //                     }
+	// 	    } else {
+	// 	        match shell.command(parsed_response.command.clone()).output().await { // so unsafe we need to whitelist only gsettings
+    //                         Ok(output) => {
+    //                             if output.status.success() {
+    //                                 println!("Command result: {:?}", String::from_utf8(output.stdout));
+    //                             } else {
+    //                                 println!("Exit with code: {}", output.status.code().unwrap());
+    //                             }
+    //                         }
+    //                         Err(e) => {
+    //                             println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
+    //                         }
+    //                     }
+	// 	    }
+		    
+    //                 // we will need to save new command settings here
+    //                 println!("Command executed: {}", parsed_response.command);
+    //                 res.message = Some(ChatMessage::new(
+    //                     MessageRole::Assistant,
+    //                     parsed_response.message,
+    //                 ));
+    //                 println!("Model Response: {:?}", res);
+    //                 Ok(res)
+    //             }
+    //             Err(e) => Err(format!("Failed to parse model response: {}", e)),
+    //         }
+    //     }
+    //     Err(e) => Err(format!("Failed to generate text: {}", e)),
+    // }
     match ollama
         .send_chat_messages_with_history(
             ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
@@ -114,57 +178,47 @@ with just the final JSON object, like:
         .await
     {
         Ok(mut res) => {
-            println!("Received initial response: {:?}", res);
-            // let response = res.message.unwrap().content;
-	    let response = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
+            let response = res.message.unwrap().content;
             match parse_model_response(response) {
                 Ok(parsed_response) => {
-                    // execute shell command https://v2.tauri.app/plugin/shell/
-                    let shell = app_handle.shell();
-
-		    let command_parts: Vec<&str> = parsed_response.command.split_whitespace().collect();
-		    if let Some((command, args)) = command_parts.split_first() {
-		        match shell.command(command).args(args).output().await { // so unsafe we need to whitelist only gsettings
-                            Ok(output) => {
-                                if output.status.success() {
-                                    println!("Command result: {:?}", String::from_utf8(output.stdout));
-                                } else {
-                                    println!("Exit with code: {}", output.status.code().unwrap());
-                                }
-                            }
-                            Err(e) => {
-                                println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
-                            }
-                        }
-		    } else {
-		        match shell.command(parsed_response.command.clone()).output().await { // so unsafe we need to whitelist only gsettings
-                            Ok(output) => {
-                                if output.status.success() {
-                                    println!("Command result: {:?}", String::from_utf8(output.stdout));
-                                } else {
-                                    println!("Exit with code: {}", output.status.code().unwrap());
-                                }
-                            }
-                            Err(e) => {
-                                println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
-                            }
-                        }
-		    }
-		    
-                    // we will need to save new command settings here
-                    println!("Command executed: {}", parsed_response.command);
                     res.message = Some(ChatMessage::new(
                         MessageRole::Assistant,
                         parsed_response.message,
                     ));
-                    println!("Model Response: {:?}", res);
-                    Ok(res)
+                    
+                    Ok(GenerateResult {
+                        ollama_response: res,
+                        command: Some(parsed_response.command),
+                    })
                 }
                 Err(e) => Err(format!("Failed to parse model response: {}", e)),
             }
         }
         Err(e) => Err(format!("Failed to generate text: {}", e)),
     }
+}
+
+#[tauri::command]
+async fn execute_command(
+    command: String,
+    app_handle: tauri::AppHandle
+) -> Result<(), String> {
+    let shell = app_handle.shell();
+    let command_parts: Vec<&str> = command.split_whitespace().collect();
+    
+    let output = if let Some((cmd, args)) = command_parts.split_first() {
+        shell.command(cmd)
+            .args(args)
+            .output()
+            .await
+    } else {
+        shell.command(command)
+            .output()
+            .await
+    };
+
+    output.map_err(|e| format!("Command execution failed: {}", e))?;
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -274,7 +328,7 @@ pub fn run() {
             )
         )))
         .manage(ChatIDs(TokioMutex::new(HashMap::new())))
-        .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences])
+        .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences, execute_command])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

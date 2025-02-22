@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Image } from "@chakra-ui/react";
+import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Image, Code } from "@chakra-ui/react";
+import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton } from "@chakra-ui/modal";
 
 function App() {
   const [models, setModels] = useState([]);
@@ -14,6 +15,7 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [isFading, setIsFading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingCommand, setPendingCommand] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -25,11 +27,19 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-
-
   async function listModels() {
     setModels(await invoke("list_models"));
   }
+
+  type GenerateResult = {
+    ollama_response: {
+      model: string;
+      created_at: string;
+      message: ChatMessage;
+      done: boolean;
+    };
+    command?: string;
+  };
 
   type Response = {
     model: string;
@@ -81,9 +91,29 @@ function App() {
     setMessages([...messages, userMessage]);
     setPrompt("");
     setIsLoading(true);
-    const response: Response = await invoke("generate", { request: { model: selectedModel, prompt, chat_id: chatID } });
-    const botMessage = { sender: "bot", text: response.message.content };
+    // const response: Response = await invoke("generate", { request: { model: selectedModel, prompt, chat_id: chatID } });
+    // const botMessage = { sender: "bot", text: response.message.content };
+    // setMessages([...messages, userMessage, botMessage]);
+    // setIsLoading(false);
+    const result = await invoke<GenerateResult>("generate", { 
+      request: { 
+        model: selectedModel, 
+        prompt, 
+        chat_id: chatID 
+      } 
+    });
+  
+    const botMessage = { 
+      sender: "bot", 
+      text: result.ollama_response.message.content 
+    };
+    
     setMessages([...messages, userMessage, botMessage]);
+    
+    if (result.command) {
+      setPendingCommand(result.command);
+    }
+    
     setIsLoading(false);
   }
 
@@ -187,6 +217,35 @@ function App() {
             Switch Proximity Agent
         </Button>
         </Flex>
+        <Modal isOpen={!!pendingCommand} onClose={() => setPendingCommand(null)}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Confirm Command Execution</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <Text>Run this command?</Text>
+              <Code p={2} my={2} display="block">{pendingCommand}</Code>
+              <Text>This will modify your system settings.</Text>
+            </ModalBody>
+            <ModalFooter>
+              <Button mr={3} onClick={() => setPendingCommand(null)}>
+                Cancel
+              </Button>
+              <Button colorScheme="blue" onClick={async () => {
+                if (pendingCommand) {
+                  try {
+                    await invoke("execute_command", { command: pendingCommand });
+                  } catch (error) {
+                    alert(`Error: ${error}`);
+                  }
+                  setPendingCommand(null);
+                }
+              }}>
+                Execute
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
         <VStack align="stretch" flex="1" mt={4}>
           <Box>
             <Text fontSize="xl" textAlign="center">Available models</Text>

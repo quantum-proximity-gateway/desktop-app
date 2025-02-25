@@ -11,6 +11,7 @@ use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 
 const OLLAMA_BASE_URL: &str = "https://ab1a-144-82-8-147.ngrok-free.app";
+const SERVER_URL: &str = "https://7011-144-82-8-84.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
@@ -70,6 +71,26 @@ struct GenerateResult {
     command: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct PreferencesAPIResponse {
+    preferences: serde_json::Value,
+}
+
+#[tauri::command]
+async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let shell = app_handle.shell();
+
+    let output = shell.command("whoami").output().await
+	.map_err(|e| format!("Failed to run whoami: {}", e))?;
+
+    if output.status.success() {
+	let username = String::from_utf8_lossy(&output.stdout).trim().to_string();
+	Ok(username)
+    } else {
+	Err(format!("Command failed with exit code: {:?}", output.status.code()))
+    }
+}
+
 #[tauri::command]
 async fn generate(
     request: ChatRequest,
@@ -79,7 +100,15 @@ async fn generate(
 ) -> Result<GenerateResult, String> {
     println!("Generating response for {:?}", request);
 
-    let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+    let username = match get_username(app_handle.clone()).await {
+	Ok(username) => username,
+	Err(e) => {
+	    println!("Warning: failed to get username from whoami: {}", e);
+	}
+    }
+    
+    // let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+    let url = format!("{}/preferences/{}", SERVER_URL, username);
 
     let sys_prompt = format!(
 	r#""You're an assistant that only replies in JSON format with keys "message" and "command".
@@ -381,7 +410,7 @@ pub fn run() {
             )
         )))
         .manage(ChatIDs(TokioMutex::new(HashMap::new())))
-        .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences, execute_command])
+        .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences, execute_command, get_username])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

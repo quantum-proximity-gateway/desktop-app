@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Image, Code } from "@chakra-ui/react";
+// import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Image, Code } from "@chakra-ui/react";
+import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Code } from "@chakra-ui/react";
 import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton } from "@chakra-ui/modal";
 
 function App() {
@@ -41,12 +42,12 @@ function App() {
     command?: string;
   };
 
-  type Response = {
-    model: string;
-    created_at: string;
-    message: ChatMessage;
-    done: boolean;
-  };
+  // type Response = {
+  //   model: string;
+  //   created_at: string;
+  //   message: ChatMessage;
+  //   done: boolean;
+  // };
 
   type ChatMessage = {
     role: string;

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Preferences Chatbot",
+  "productName": "PreferencesChatbot",
   "version": "0.1.0",
   "identifier": "com.comp0016-qpg.app",
   "build": {

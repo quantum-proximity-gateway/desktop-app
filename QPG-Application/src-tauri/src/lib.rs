@@ -75,7 +75,7 @@ async fn generate(
     request: ChatRequest,
     g_ollama: State<'_, OllamaInstance>,
     seen_chats: State<'_, ChatIDs>,
-    app_handle: tauri::AppHandle
+    _app_handle: tauri::AppHandle
 ) -> Result<GenerateResult, String> {
     println!("Generating response for {:?}", request);
 
@@ -94,8 +94,10 @@ Below is a reference JSON that shows possible accessibility commands for GNOME:
 
 {}
 
-Use this reference to inform your responses if needed. However, always reply
-with just the final JSON object, like:
+The "current" field is the current value on the computer, while the "lower_bound",
+"upper_bound", and "default" fields represent the ranges/values in gsettings.
+Use this reference to inform your responses if needed. However, always reply with just
+the final JSON object, like:
 
 {{
   "message": "...",
@@ -286,7 +288,7 @@ enum DefaultValue {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Setting {
+pub struct Setting {
     #[serde(default)]
     lower_bound: Option<f32>,
     #[serde(default)]
@@ -354,7 +356,7 @@ pub fn run() {
                 use tauri_plugin_autostart::MacosLauncher;
                 use tauri_plugin_autostart::ManagerExt;
 
-                app.handle().plugin(tauri_plugin_autostart::init(
+                let _ = app.handle().plugin(tauri_plugin_autostart::init(
                     MacosLauncher::LaunchAgent,
                     Some(vec!["--flag1", "--flag2"]),
                 ));

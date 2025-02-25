@@ -4,13 +4,12 @@ use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, Chat
 use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 
-const OLLAMA_BASE_URL: &str = "https://ab1a-144-82-8-147.ngrok-free.app";
+const OLLAMA_BASE_URL: &str = "https://9ecc-144-82-8-147.ngrok-free.app";
 const SERVER_URL: &str = "https://7011-144-82-8-84.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
@@ -102,7 +101,7 @@ async fn generate(
     request: ChatRequest,
     g_ollama: State<'_, OllamaInstance>,
     seen_chats: State<'_, ChatIDs>,
-    _app_handle: tauri::AppHandle
+    app_handle: tauri::AppHandle
 ) -> Result<GenerateResult, String> {
     println!("Generating response for {:?}", request);
 
@@ -110,21 +109,31 @@ async fn generate(
         Ok(username) => username,
         Err(e) => {
             println!("Warning: failed to get username from whoami: {}", e);
+	    return Err(format!("Failed to fetch username."));
         }
-    }
+    };
+
+    println!("past username {:?}", username);
 
     let client = Client::new();
     let url = format!("{}/preferences/{}", SERVER_URL, username);
-    let response = client.get(&url).send().await.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
+    let response = client
+	.get(&url)
+	.send()
+	.await
+	.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
+
+    println!("past response {:?}", response.status());
 
     if !response.status().is_success() {
         return Err(format!("Failed to fetch preferences: {}", response.status()));
     }
 
     let preferences = response.json::<PreferencesAPIResponse>().await.map_err(|e| format!("Failed to parse JSON: {}", e))?;
-    // let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+    println!("past prefs");
     let json_example = preferences.preferences.to_string();
-
+    println!("past json eg");
+    
     let sys_prompt = format!(
 	r#""You're an assistant that only replies in JSON format with keys "message" and "command".
 It is very important that you stick to the following JSON format.
@@ -290,8 +299,9 @@ async fn execute_command(
         Ok(username) => username,
         Err(e) => {
             println!("Warning: failed to get username from whoami: {}", e);
+	    return Err(format!("Failed to fetch username."));
         }
-    }
+    };
 
     println!("Attempting to run shell command: {}", command);
 
@@ -300,8 +310,8 @@ async fn execute_command(
 	match shell.command(cmd).args(args).output().await { // so unsafe we need to whitelist only gsettings
             Ok(output) => {
                 if output.status.success() {
-		            let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
-                    println!("Command result: {:?}", String::from_utf8_lossy(&output.stdout));
+		    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+                    println!("Command result: {:?}", stdout_str);
 
                     if !args.is_empty() {
                         let new_value_str = args.last().unwrap().to_string();

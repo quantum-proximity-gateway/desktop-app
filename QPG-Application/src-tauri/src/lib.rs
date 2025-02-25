@@ -9,8 +9,8 @@ use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 
-const OLLAMA_BASE_URL: &str = "https://9ecc-144-82-8-147.ngrok-free.app";
-const SERVER_URL: &str = "https://7011-144-82-8-84.ngrok-free.app";
+const OLLAMA_BASE_URL: &str = "https://9c5f-144-82-8-84.ngrok-free.app";
+const SERVER_URL: &str = "https://c462-144-82-8-147.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
@@ -129,7 +129,10 @@ async fn generate(
         return Err(format!("Failed to fetch preferences: {}", response.status()));
     }
 
-    let preferences = response.json::<PreferencesAPIResponse>().await.map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let response_body = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
+    println!("Response body: {}", response_body);
+
+    let preferences: PreferencesAPIResponse = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
     println!("past prefs");
     let json_example = preferences.preferences.to_string();
     println!("past json eg");

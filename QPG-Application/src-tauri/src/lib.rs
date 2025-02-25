@@ -76,6 +76,12 @@ struct PreferencesAPIResponse {
     preferences: serde_json::Value,
 }
 
+#[derive(Serialize, Deserialize)]
+struct UpdateJSONPreferencesRequest {
+    username: String,
+    preferences: AppConfig,
+}
+
 #[tauri::command]
 async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
     let shell = app_handle.shell();
@@ -101,14 +107,23 @@ async fn generate(
     println!("Generating response for {:?}", request);
 
     let username = match get_username(app_handle.clone()).await {
-	Ok(username) => username,
-	Err(e) => {
-	    println!("Warning: failed to get username from whoami: {}", e);
-	}
+        Ok(username) => username,
+        Err(e) => {
+            println!("Warning: failed to get username from whoami: {}", e);
+        }
     }
-    
-    // let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+
+    let client = Client::new();
     let url = format!("{}/preferences/{}", SERVER_URL, username);
+    let response = client.get(&url).send().await.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Failed to fetch preferences: {}", response.status()));
+    }
+
+    let preferences = response.json::<PreferencesAPIResponse>().await.map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    // let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+    let json_example = preferences.preferences.to_string();
 
     let sys_prompt = format!(
 	r#""You're an assistant that only replies in JSON format with keys "message" and "command".
@@ -174,48 +189,73 @@ the final JSON object, like:
     }
 }
 
-fn update_json_current_value(
-    old_json_str: &str,
-    json_file_path: &str,
+async fn update_json_current_value(
+    username: &str,
     base_command: &str,
     new_value_str: &str,
-) {
-    let mut config: AppConfig = match serde_json::from_str(old_json_str) {
-	Ok(cfg) => cfg,
-	Err(e) => {
-	    println!("Could not parse existing JSON: {:?}", e);
-	    return;
-	}
-    };
+) -> Result<(), String> {
+    let client = Client::new();
+    let get_url = format!("{}/preferences/{}", SERVER_URL, username);
+    let response = client
+        .get(&get_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch preferences: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Failed to fetch preferences: status {}",
+            response.status()
+        ));
+    }
+
+    let prefs_resp = response
+        .json::<PreferencesAPIResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse preferences JSON: {}", e))?;
+
+    let mut config: AppConfig = serde_json::from_value(prefs_resp.preferences)
+        .map_err(|e| format!("Could not parse preferences into AppConfig: {}", e))?;
 
     let mut found_match = false;
-
     for (key, setting) in config.iter_mut() {
-	if setting.commands.gnome.trim() == base_command.trim() {
-	    let new_val: DefaultValue = parse_new_value(new_value_str, &setting.default);
-	    setting.current = Some(new_val);
+        if setting.commands.gnome.trim() == base_command.trim() {
+            let new_val: DefaultValue = parse_new_value(new_value_str, &setting.default);
+            setting.current = Some(new_val);
 
-	    found_match = true;
-	    println!("Updated '{}': current is now '{}'", key, new_value_str);
+            found_match = true;
+            println!("Updated '{}': current is now '{}'", key, new_value_str);
             break;
-	}
-    }
-
-    if !found_match {
-	println!("No command exists for: {}", base_command);
-        return;
-    }
-
-    match serde_json::to_string_pretty(&config) {
-        Ok(updated_json_str) => {
-            if let Err(e) = fs::write(json_file_path, updated_json_str) {
-                println!("Failed to write updated JSON file: {}", e);
-            } else {
-                println!("Successfully updated JSON file.");
-            }
         }
-        Err(e) => println!("Failed to serialize updated config: {}", e),
     }
+
+    if !found_match { // no match in json for command
+        println!("No command exists for: {}", base_command);
+        return Ok(());
+    }
+
+    let update_payload = UpdateJSONPreferencesRequest {
+        username: username.to_string(),
+        preferences: config,
+    };
+
+    let post_url = format!("{}/preferences/update", SERVER_URL);
+    let update_resp = client
+        .post(&post_url)
+        .json(&update_payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send update to server: {}", e))?;
+
+    if !update_resp.status().is_success() {
+        return Err(format!(
+            "Server failed to update preferences. Status: {}",
+            update_resp.status()
+        ));
+    }
+
+    println!("Successfully updated preferences on the server.");
+    Ok(())
 }
 
 fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultValue {
@@ -245,7 +285,13 @@ async fn execute_command(
 ) -> Result<(), String> {
     // execute shell command https://v2.tauri.app/plugin/shell/
     let shell = app_handle.shell();
-    let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
+    
+    let username = match get_username(app_handle.clone()).await {
+        Ok(username) => username,
+        Err(e) => {
+            println!("Warning: failed to get username from whoami: {}", e);
+        }
+    }
 
     println!("Attempting to run shell command: {}", command);
 
@@ -254,23 +300,23 @@ async fn execute_command(
 	match shell.command(cmd).args(args).output().await { // so unsafe we need to whitelist only gsettings
             Ok(output) => {
                 if output.status.success() {
-		    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
-                    println!("Command result: {:?}", stdout_str);
+		            let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+                    println!("Command result: {:?}", String::from_utf8_lossy(&output.stdout));
 
-		    if !args.is_empty() {
-			let new_value_str = args.last().unwrap().to_string();
-			let base_command_str = {
+                    if !args.is_empty() {
+                        let new_value_str = args.last().unwrap().to_string();
+                        let base_command_str = {
                             let without_last = &args[..args.len() - 1];
                             format!("{} {}", cmd, without_last.join(" "))
                         };
 
-			update_json_current_value(
-			    &json_example,
-			    "src/json_example.json",
-			    &base_command_str,
-			    &new_value_str,
-			);
-		    }
+                        update_json_current_value(
+                            &username,
+                            &base_command_str,
+                            &new_value_str,
+                        )
+                        .await?;
+	        	    }
                 } else {
                     println!("Exit with code: {}", output.status.code().unwrap());
                 }

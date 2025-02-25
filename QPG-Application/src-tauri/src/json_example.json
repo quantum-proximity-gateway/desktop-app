@@ -1,46 +1,13 @@
 {
-  "cursor_size": {
-    "lower_bound": 0.0,
-    "upper_bound": 128.0,
-    "default": 24.0,
-    "current": 24.0,
-    "commands": {
-      "windows": "",
-      "macos": "",
-      "gnome": "gsettings set org.gnome.desktop.interface cursor-size"
-    }
-  },
-  "on_screen_keyboard": {
+  "font_name": {
     "lower_bound": null,
     "upper_bound": null,
-    "default": false,
-    "current": false,
+    "default": "Cantarell 11",
+    "current": "Cantarell 11",
     "commands": {
       "windows": "",
       "macos": "",
-      "gnome": "gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled"
-    }
-  },
-  "enable_animation": {
-    "lower_bound": null,
-    "upper_bound": null,
-    "default": true,
-    "current": true,
-    "commands": {
-      "windows": "",
-      "macos": "",
-      "gnome": "gsettings set org.gnome.desktop.interface enable-animations"
-    }
-  },
-  "locate_pointer": {
-    "lower_bound": null,
-    "upper_bound": null,
-    "default": false,
-    "current": false,
-    "commands": {
-      "windows": "",
-      "macos": "",
-      "gnome": "gsettings set org.gnome.desktop.interface locate-pointer"
+      "gnome": "gsettings set org.gnome.desktop.interface font-name"
     }
   },
   "screen_reader": {
@@ -54,15 +21,37 @@
       "gnome": "gsettings set org.gnome.desktop.a11y.applications screen-reader-enabled"
     }
   },
-  "font_name": {
-    "lower_bound": null,
-    "upper_bound": null,
-    "default": "Cantarell 11",
-    "current": "Cantarell 11",
+  "cursor_size": {
+    "lower_bound": 0.0,
+    "upper_bound": 128.0,
+    "default": 24.0,
+    "current": 24.0,
     "commands": {
       "windows": "",
       "macos": "",
-      "gnome": "gsettings set org.gnome.desktop.interface font-name"
+      "gnome": "gsettings set org.gnome.desktop.interface cursor-size"
+    }
+  },
+  "zoom": {
+    "lower_bound": 0.5,
+    "upper_bound": 3.0,
+    "default": 1.0,
+    "current": 1.5,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.interface text-scaling-factor"
+    }
+  },
+  "on_screen_keyboard": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": false,
+    "current": false,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled"
     }
   },
   "magnifier": {
@@ -76,15 +65,26 @@
       "gnome": "gsettings set org.gnome.desktop.a11y.magnifier mag-factor"
     }
   },
-  "zoom": {
-    "lower_bound": 0.5,
-    "upper_bound": 3.0,
-    "default": 1.0,
-    "current": 2.0,
+  "locate_pointer": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": false,
+    "current": false,
     "commands": {
       "windows": "",
       "macos": "",
-      "gnome": "gsettings set org.gnome.desktop.interface text-scaling-factor"
+      "gnome": "gsettings set org.gnome.desktop.interface locate-pointer"
+    }
+  },
+  "enable_animation": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": true,
+    "current": true,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.interface enable-animations"
     }
   }
 }

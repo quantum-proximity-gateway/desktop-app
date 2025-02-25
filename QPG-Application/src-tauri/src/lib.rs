@@ -76,7 +76,7 @@ async fn generate(
     g_ollama: State<'_, OllamaInstance>,
     seen_chats: State<'_, ChatIDs>,
     app_handle: tauri::AppHandle
-) -> Result<ChatMessageResponse, String> {
+) -> Result<GenerateResult, String> {
     println!("Generating response for {:?}", request);
 
     let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
@@ -123,69 +123,18 @@ with just the final JSON object, like:
     {
         Ok(mut res) => {
             println!("Received initial response: {:?}", res);
-            // let response = res.message.unwrap().content;
 	    let response = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
             match parse_model_response(response) {
                 Ok(parsed_response) => {
-                    // execute shell command https://v2.tauri.app/plugin/shell/
-                    let shell = app_handle.shell();
-
-		    let command_str = parsed_response.command.clone();
-		    println!("Attempting to run shell command: {}", command_str);
-
-		    let command_parts: Vec<&str> = parsed_response.command.split_whitespace().collect();
-		    if let Some((command, args)) = command_parts.split_first() {
-		        match shell.command(command).args(args).output().await { // so unsafe we need to whitelist only gsettings
-                            Ok(output) => {
-                                if output.status.success() {
-				    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
-                                    println!("Command result: {:?}", stdout_str);
-
-				    if !args.is_empty() {
-					let new_value_str = args.last().unwrap().to_string();
-					let base_command_str = {
-                                            let without_last = &args[..args.len() - 1];
-                                            format!("{} {}", command, without_last.join(" "))
-                                        };
-
-					update_json_current_value(
-					    &json_example,
-					    "src/json_example.json",
-					    &base_command_str,
-					    &new_value_str,
-					);
-				    }
-                                } else {
-                                    println!("Exit with code: {}", output.status.code().unwrap());
-                                }
-                            }
-                            Err(e) => {
-                                println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
-                            }
-                        }
-		    } else {
-		        match shell.command(parsed_response.command.clone()).output().await { // so unsafe we need to whitelist only gsettings
-                            Ok(output) => {
-                                if output.status.success() {
-                                    println!("Command result: {:?}", String::from_utf8(output.stdout));
-                                } else {
-                                    println!("Exit with code: {}", output.status.code().unwrap());
-                                }
-                            }
-                            Err(e) => {
-                                println!("Failed to execute command: {} with error {}", parsed_response.command.clone(), e);
-                            }
-                        }
-		    }
-		    
-                    // we will need to save new command settings here
-                    println!("Command executed: {}", parsed_response.command);
                     res.message = Some(ChatMessage::new(
-                        MessageRole::Assistant,
-                        parsed_response.message,
-                    ));
-                    println!("Model Response: {:?}", res);
-                    Ok(res)
+			MessageRole::Assistant,
+			parsed_response.message,
+		    ));
+
+		    Ok(GenerateResult {
+			ollama_response: res,
+			command: Some(parsed_response.command),
+		    })
                 }
                 Err(e) => Err(format!("Failed to parse model response: {}", e)),
             }
@@ -263,21 +212,60 @@ async fn execute_command(
     command: String,
     app_handle: tauri::AppHandle
 ) -> Result<(), String> {
+    // execute shell command https://v2.tauri.app/plugin/shell/
     let shell = app_handle.shell();
-    let command_parts: Vec<&str> = command.split_whitespace().collect();
-    
-    let output = if let Some((cmd, args)) = command_parts.split_first() {
-        shell.command(cmd)
-            .args(args)
-            .output()
-            .await
-    } else {
-        shell.command(command)
-            .output()
-            .await
-    };
+    let json_example = fs::read_to_string("src/json_example.json").unwrap_or_else(|_| "{}".to_string());
 
-    output.map_err(|e| format!("Command execution failed: {}", e))?;
+    println!("Attempting to run shell command: {}", command);
+
+    let command_parts: Vec<&str> = command.split_whitespace().collect();
+    if let Some((cmd, args)) = command_parts.split_first() {
+	match shell.command(cmd).args(args).output().await { // so unsafe we need to whitelist only gsettings
+            Ok(output) => {
+                if output.status.success() {
+		    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+                    println!("Command result: {:?}", stdout_str);
+
+		    if !args.is_empty() {
+			let new_value_str = args.last().unwrap().to_string();
+			let base_command_str = {
+                            let without_last = &args[..args.len() - 1];
+                            format!("{} {}", cmd, without_last.join(" "))
+                        };
+
+			update_json_current_value(
+			    &json_example,
+			    "src/json_example.json",
+			    &base_command_str,
+			    &new_value_str,
+			);
+		    }
+                } else {
+                    println!("Exit with code: {}", output.status.code().unwrap());
+                }
+            }
+            Err(e) => {
+                println!("Failed to execute command: {} with error {}", command, e);
+            }
+        }
+    } else {
+	match shell.command(command.clone()).output().await { // so unsafe we need to whitelist only gsettings
+            Ok(output) => {
+                if output.status.success() {
+                    println!("Command result: {:?}", String::from_utf8(output.stdout));
+                } else {
+                    println!("Exit with code: {}", output.status.code().unwrap());
+                }
+            }
+            Err(e) => {
+                println!("Failed to execute command: {} with error {}", command, e);
+            }
+        }
+    }
+    
+    // we will need to save new command settings here
+    println!("Command executed: {}", command);
+
     Ok(())
 }
 

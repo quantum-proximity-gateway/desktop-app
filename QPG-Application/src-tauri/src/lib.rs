@@ -9,8 +9,8 @@ use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 
-const OLLAMA_BASE_URL: &str = "https://9c5f-144-82-8-84.ngrok-free.app";
-const SERVER_URL: &str = "https://c462-144-82-8-147.ngrok-free.app";
+const OLLAMA_BASE_URL: &str = "http://localhost:11434";
+const SERVER_URL: &str = "http://127.0.0.1:8000";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
@@ -103,8 +103,11 @@ async fn generate(
     seen_chats: State<'_, ChatIDs>,
     app_handle: tauri::AppHandle
 ) -> Result<GenerateResult, String> {
+
+    
     println!("Generating response for {:?}", request);
 
+    // Fetch username using whomai to fetch user's preferences
     let username = match get_username(app_handle.clone()).await {
         Ok(username) => username,
         Err(e) => {
@@ -114,7 +117,8 @@ async fn generate(
     };
 
     println!("past username {:?}", username);
-
+    
+    // Fetch preferences
     let client = Client::new();
     let url = format!("{}/preferences/{}", SERVER_URL, username);
     let response = client
@@ -132,6 +136,8 @@ async fn generate(
     let response_body = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
     println!("Response body: {}", response_body);
 
+
+    // Some issue here maybe reuse fetch_username
     let preferences: PreferencesAPIResponse = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
     println!("past prefs");
     let json_example = preferences.preferences.to_string();
@@ -160,6 +166,7 @@ the final JSON object, like:
   "command": "..."
 }}"#, json_example);
     
+    // Prompt the model
     let mut ollama = g_ollama.0.lock().await;
     let mut seen_chats = seen_chats.0.lock().await;
     
@@ -390,7 +397,7 @@ pub struct Setting {
 pub type AppConfig = HashMap<String, Setting>;
 
 #[tauri::command]
-async fn fetch_preferences() -> Result<AppConfig, String> {
+async fn fetch_preferences(app_handle: tauri::AppHandle) -> Result<AppConfig, String> {
     use std::fs;
     use serde_json;
 
@@ -408,7 +415,15 @@ async fn fetch_preferences() -> Result<AppConfig, String> {
         }
     };
 
-    let api_url = "https://localhost:8000/devices/{username}/preferences"; // Replace placeholders with actual values
+    let username = match get_username(app_handle.clone()).await {
+        Ok(username) => username,
+        Err(e) => {
+            println!("Warning: failed to get username from whoami: {}", e);
+	    return Err(format!("Failed to fetch username."));
+        }
+    };
+
+    let api_url = format!("{}/devices/{}/preferences", SERVER_URL, username);
     let client = Client::new();
 
     match client.get(api_url).send().await {

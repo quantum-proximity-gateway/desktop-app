@@ -9,26 +9,26 @@ const SERVER_URL: &str = "http://127.0.0.1:8000";
 
 #[derive(Serialize, Deserialize)]
 pub struct EncapsulationResult {
-    ciphertext_b64: String,
-    secret: Box<[u8]>,
+    pub ciphertext_b64: String,
+    pub secret: Box<[u8]>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SharedSecretInput {
-    client_id: String,
-    public_key_b64: String
+    pub client_id: String,
+    pub public_key_b64: String
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EncryptionInput {
-    plaintext: String,
-    public_key_b64: String
+    pub plaintext: String,
+    pub public_key_b64: String
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EncryptionResult {
-    plaintext: String,
-    public_key_b64: String
+    pub plaintext: String,
+    pub public_key_b64: String
 }
 
 pub struct EncryptionClient {
@@ -40,21 +40,19 @@ impl EncryptionClient {
 
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let client_id = Uuid::new_v4().to_string();
+	let public_key_b64 = Self::initiate_kem(&client_id).await?;
 
         let data = SharedSecretInput {
             client_id: client_id.clone(),
-            public_key_b64: Self::initiate_kem(&client_id).await?,
+            public_key_b64,
         };
 
         let results: EncapsulationResult = Self::generate_shared_secret(data)?;
-        let ciphertext_b64 = results.ciphertext_b64;
 
-        Self::complete_kem(&client_id, ciphertext_b64).await?;
-        let shared_secret = results.secret;
-        
+        Self::complete_kem(&client_id, &results.ciphertext_b64).await?;
         
         Ok(Self {
-            shared_secret,
+            shared_secret: results.secret,
             client_id,
         })
     }
@@ -80,7 +78,7 @@ impl EncryptionClient {
         }
     }
 
-    pub async fn complete_kem(client_id: &str, ciphertext_b64: String) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn complete_kem(client_id: &str, ciphertext_b64: &str) -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::new();
         let response = client.post(format!("{}/kem/complete", SERVER_URL))
             .json(&json!({
@@ -118,4 +116,3 @@ impl EncryptionClient {
     }
 
 }
-

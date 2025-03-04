@@ -1,48 +1,131 @@
-use ollama_rs::generation::chat::MessageRole;
+// use ollama_rs::generation::chat::MessageRole;
 use url::Url;
-use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
-use ollama_rs::Ollama;
+// use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
+// use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
+use llama_cpp_2::context::params::LlamaContextParams;
+use llama_cpp_2::llama_backend::LlamaBackend;
+use llama_cpp_2::llama_batch::LlamaBatch;
+use llama_cpp_2::model::params::LlamaModelParams;
+use llama_cpp_2::model::LlamaModel;
+use llama_cpp_2::model::{AddBos, Special};
+use llama_cpp_2::sampling::LlamaSampler;
+use std::io::Write;
 
-const OLLAMA_BASE_URL: &str = "http://localhost:11434";
+// const OLLAMA_BASE_URL: &str = "http://localhost:11434";
 const SERVER_URL: &str = "http://127.0.0.1:8000";
 
-struct OllamaInstance(TokioMutex<Ollama>);
-struct ChatIDs(TokioMutex<HashMap<String, bool>>);
+// struct OllamaInstance(TokioMutex<Ollama>);
+// struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 
-#[tauri::command]
-async fn list_models() -> Result<Vec<String>, String> {
-    let ollama = Ollama::new_with_history_from_url(
-        Url::parse(OLLAMA_BASE_URL).unwrap(),
-        50,
-    );
-    let default_model_name = "granite3-dense:8b".to_string();
+pub struct LlamaGenerator {
+    backend: LlamaBackend,
+    model: LlamaModel,
+}
 
-    let local_models = match ollama.list_local_models().await {
-        Ok(res) => res,
-        Err(e) => return Err(format!("Failed to list models: {}", e)),
-    };
-
-    if local_models.is_empty() { // Download model in the case that it does not exist
-        println!("No local models found. Pulling {}...", default_model_name);
-        if let Err(e) = ollama.pull_model(default_model_name.into(), false).await {
-            return Err(format!("Failed to pull model: {}", e));
-        }
+impl LlamaGenerator {
+    /// Loads the model from the given path and returns a reusable generator.
+    pub fn new(model_path: &str) -> Self {
+        let backend = LlamaBackend::init().unwrap();
+        let params = LlamaModelParams::default();
+        let model = LlamaModel::load_from_file(&backend, model_path, &params)
+            .expect("unable to load model");
+        Self { backend, model }
     }
 
-    let updated_models = match ollama.list_local_models().await {
-        Ok(res) => res,
-        Err(e) => return Err(format!("Failed to list models: {}", e)),
-    };
+    /// Generates text from the given prompt.
+    ///
+    /// This method creates a new context for each prompt, tokenizes the prompt, and then
+    /// iteratively decodes tokens until either an end-of-stream token is produced or a fixed
+    /// token limit is reached.
+    pub fn generate(&self, prompt: &str) -> String {
+        let ctx_params = LlamaContextParams::default();
+        let mut ctx = self.model.new_context(&self.backend, ctx_params)
+            .expect("unable to create the llama_context");
 
-    let models: Vec<String> = updated_models.into_iter().map(|model| model.name).collect();
-    Ok(models)
+        // Tokenize the input prompt.
+        let tokens_list = self.model
+            .str_to_token(prompt, AddBos::Always)
+            .unwrap_or_else(|_| panic!("failed to tokenize {}", prompt));
+
+        // Set a fixed generation length (here: 64 tokens)
+        let n_len = 64;
+        let mut batch = LlamaBatch::new(512, 1);
+        let last_index = tokens_list.len() as i32 - 1;
+
+        // Prepare the batch with the prompt tokens.
+        for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
+            let is_last = i == last_index;
+            batch.add(token, i, &[0], is_last).unwrap();
+        }
+        ctx.decode(&mut batch).expect("llama_decode() failed");
+
+        let mut n_cur = batch.n_tokens();
+        let mut decoder = encoding_rs::UTF_8.new_decoder();
+        let mut sampler = LlamaSampler::greedy();
+        let mut output = String::new();
+
+        // Generate tokens until reaching the desired length or an EOS token.
+        while n_cur <= n_len {
+            let token = sampler.sample(&ctx, batch.n_tokens() - 1);
+            sampler.accept(token);
+
+            // Stop if end-of-stream token is reached.
+            if token == self.model.token_eos() {
+                break;
+            }
+
+            let output_bytes = self.model
+                .token_to_bytes(token, Special::Tokenize)
+                .expect("token_to_bytes failed");
+
+            let mut output_string = String::with_capacity(32);
+            let _ = decoder.decode_to_string(&output_bytes, &mut output_string, false);
+            output.push_str(&output_string);
+
+            batch.clear();
+            batch.add(token, n_cur, &[0], true).unwrap();
+            n_cur += 1;
+            ctx.decode(&mut batch).expect("failed to eval");
+        }
+
+        output
+    }
 }
+
+// #[tauri::command]
+// async fn list_models() -> Result<Vec<String>, String> {
+//     let ollama = Ollama::new_with_history_from_url(
+//         Url::parse(OLLAMA_BASE_URL).unwrap(),
+//         50,
+//     );
+//     let default_model_name = "granite3-dense:8b".to_string();
+
+//     let local_models = match ollama.list_local_models().await {
+//         Ok(res) => res,
+//         Err(e) => return Err(format!("Failed to list models: {}", e)),
+//     };
+
+//     if local_models.is_empty() { // Download model in the case that it does not exist
+//         println!("No local models found. Pulling {}...", default_model_name);
+//         if let Err(e) = ollama.pull_model(default_model_name.into(), false).await {
+//             return Err(format!("Failed to pull model: {}", e));
+//         }
+//     }
+
+//     let updated_models = match ollama.list_local_models().await {
+//         Ok(res) => res,
+//         Err(e) => return Err(format!("Failed to list models: {}", e)),
+//     };
+
+//     let models: Vec<String> = updated_models.into_iter().map(|model| model.name).collect();
+//     Ok(models)
+// }
 
 #[derive(Debug, Deserialize)]
 struct ChatRequest {
@@ -66,7 +149,7 @@ fn parse_model_response(json_str: String) -> Result<ModelResponse, serde_json::E
 
 #[derive(Serialize)]
 struct GenerateResult {
-    ollama_response: ChatMessageResponse,
+    model_response: String,
     command: Option<String>,
 }
 
@@ -99,52 +182,137 @@ async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 async fn generate(
     request: ChatRequest,
-    g_ollama: State<'_, OllamaInstance>,
-    seen_chats: State<'_, ChatIDs>,
-    app_handle: tauri::AppHandle
+    app_handle: tauri::AppHandle,
 ) -> Result<GenerateResult, String> {
-
-    
     println!("Generating response for {:?}", request);
 
-    // Fetch username using whomai to fetch user's preferences
-    let username = match get_username(app_handle.clone()).await {
-        Ok(username) => username,
-        Err(e) => {
-            println!("Warning: failed to get username from whoami: {}", e);
-	    return Err(format!("Failed to fetch username."));
-        }
-    };
+    // // Fetch username using whoami
+    // let username = match get_username(app_handle.clone()).await {
+    //     Ok(username) => username,
+    //     Err(e) => {
+    //         println!("Warning: failed to get username from whoami: {}", e);
+    //         return Err("Failed to fetch username.".into());
+    //     }
+    // };
+    // println!("Username: {:?}", username);
 
-    println!("past username {:?}", username);
-    
-    // Fetch preferences
-    let client = Client::new();
-    let url = format!("{}/preferences/{}", SERVER_URL, username);
-    let response = client
-	.get(&url)
-	.send()
-	.await
-	.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
+    // // Fetch preferences from the server
+    // let client = Client::new();
+    // let url = format!("{}/preferences/{}", SERVER_URL, username);
+    // let response = client
+    //     .get(&url)
+    //     .send()
+    //     .await
+    //     .map_err(|e| format!("Failed to fetch preferences: {}", e))?;
+    // println!("HTTP response: {:?}", response.status());
+    // if !response.status().is_success() {
+    //     return Err(format!("Failed to fetch preferences: {}", response.status()));
+    // }
+    // let response_body = response
+    //     .text()
+    //     .await
+    //     .map_err(|e| format!("Failed to read response body: {}", e))?;
+    // println!("Response body: {}", response_body);
 
-    println!("past response {:?}", response.status());
-
-    if !response.status().is_success() {
-        return Err(format!("Failed to fetch preferences: {}", response.status()));
+    // let preferences: PreferencesAPIResponse = serde_json::from_str(&response_body)
+    //     .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    // let json_example = preferences.preferences.to_string();
+    let json_example = r#"
+{
+  "zoom": {
+    "lower_bound": 0.5,
+    "upper_bound": 3.0,
+    "default": 1.0,
+    "current": 1.0,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.interface text-scaling-factor"
     }
+  },
+  "on_screen_keyboard": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": false,
+    "current": false,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled"
+    }
+  },
+  "magnifier": {
+    "lower_bound": 0.1,
+    "upper_bound": 32.0,
+    "default": 1.0,
+    "current": 1.0,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.a11y.magnifier mag-factor"
+    }
+  },
+  "enable_animation": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": true,
+    "current": true,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.interface enable-animations"
+    }
+  },
+  "screen_reader": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": false,
+    "current": false,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.a11y.applications screen-reader-enabled"
+    }
+  },
+  "cursor_size": {
+    "lower_bound": 0.0,
+    "upper_bound": 128.0,
+    "default": 24.0,
+    "current": 24.0,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.interface cursor-size"
+    }
+  },
+  "font_name": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": "Cantarell 11",
+    "current": "Cantarell 11",
+    "commands": {
+      "windows": "p",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.interface font-name"
+    }
+  },
+  "locate_pointer": {
+    "lower_bound": null,
+    "upper_bound": null,
+    "default": false,
+    "current": false,
+    "commands": {
+      "windows": "",
+      "macos": "",
+      "gnome": "gsettings set org.gnome.desktop.interface locate-pointer"
+    }
+  }
+}
+    "#;
 
-    let response_body = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
-    println!("Response body: {}", response_body);
-
-
-    // Some issue here maybe reuse fetch_username
-    let preferences: PreferencesAPIResponse = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-    println!("past prefs");
-    let json_example = preferences.preferences.to_string();
-    println!("past json eg");
-    
+    // Build the system prompt that instructs the model
     let sys_prompt = format!(
-	r#""You're an assistant that only replies in JSON format with keys "message" and "command".
+        r#""You're an assistant that only replies in JSON format with keys "message" and "command".
 It is very important that you stick to the following JSON format.
 
 Your main job is to act as a computer accessibility coach that will reply to queries with a JSON
@@ -164,47 +332,34 @@ the final JSON object, like:
 {{
   "message": "...",
   "command": "..."
-}}"#, json_example);
-    
-    // Prompt the model
-    let mut ollama = g_ollama.0.lock().await;
-    let mut seen_chats = seen_chats.0.lock().await;
-    
-    if !seen_chats.contains_key(&request.chat_id) {
-        seen_chats.insert(request.chat_id.clone(), true);
-        if let Err(e) = ollama.send_chat_messages_with_history(
-            ChatMessageRequest::new(request.model.clone(), vec![ChatMessage::system(sys_prompt)]),
-            request.chat_id.clone()).await {
-            return Err(format!("Failed to send initial chat message: {}", e));
-        }
-    }
+}}"#,
+        json_example
+    );
 
-    match ollama
-        .send_chat_messages_with_history(
-            ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
-            request.chat_id,
-        )
-        .await
-    {
-        Ok(mut res) => {
-            println!("Received initial response: {:?}", res);
-	    let response = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
-            match parse_model_response(response) {
-                Ok(parsed_response) => {
-                    res.message = Some(ChatMessage::new(
-			MessageRole::Assistant,
-			parsed_response.message,
-		    ));
+    // Combine the system prompt and user prompt into one conversation prompt.
+    // The format here follows your example with special tokens.
+    let combined_prompt = format!(
+        "<|im_start|>system\n{}\n<|im_end|>\n<|im_start|>user\n{}\n<|im_end|>\n<|im_start|>assistant\n",
+        sys_prompt, request.prompt
+    );
+    println!("Combined prompt: {}", combined_prompt);
 
-		    Ok(GenerateResult {
-			ollama_response: res,
-			command: Some(parsed_response.command),
-		    })
-                }
-                Err(e) => Err(format!("Failed to parse model response: {}", e)),
-            }
+    // Create a new LlamaGenerator instance (model path is hardcoded per your example)
+    let generator = LlamaGenerator::new("models/granite-3.0-8b-instruct-IQ4_XS.gguf");
+
+    // Generate output synchronously using your generator.
+    let output = generator.generate(&combined_prompt);
+    println!("\nFinal output: {}", output);
+
+    // Parse the model's JSON output into your expected ModelResponse.
+    match parse_model_response(output) {
+        Ok(parsed_response) => {
+            Ok(GenerateResult {
+                model_response: parsed_response.message,
+                command: Some(parsed_response.command),
+            })
         }
-        Err(e) => Err(format!("Failed to generate text: {}", e)),
+        Err(e) => Err(format!("Failed to parse model response: {}", e)),
     }
 }
 
@@ -477,14 +632,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(OllamaInstance(TokioMutex::new(
-	    Ollama::new_with_history_from_url(
-	        Url::parse(OLLAMA_BASE_URL).unwrap(),
-                50,
-            )
-        )))
-        .manage(ChatIDs(TokioMutex::new(HashMap::new())))
-        .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences, execute_command, get_username])
+        .invoke_handler(tauri::generate_handler![generate, fetch_preferences, execute_command, get_username])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

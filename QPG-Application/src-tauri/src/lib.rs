@@ -226,21 +226,16 @@ async fn update_json_current_value(
     new_value_str: &str,
     encryption_instance: State<'_, EncryptionClientInstance>,
 ) -> Result<(), String> {
-    // TODO: Encrypt here
+   
+    let encryption_client = encryption_instance.0.lock().await;
     let client = Client::new();
-    let get_url = format!("{}/preferences/{}", SERVER_URL, username);
+    let mut url = Url::parse(&format!("{}/preferences/{}", SERVER_URL, username)).unwrap();
+    url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
     let response = client
-        .get(&get_url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch preferences: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Failed to fetch preferences: status {}",
-            response.status()
-        ));
-    }
+	.get(url)
+	.send()
+	.await
+	.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
 
     let prefs_resp = response
         .json::<PreferencesAPIResponse>()
@@ -271,11 +266,15 @@ async fn update_json_current_value(
         username: username.to_string(),
         preferences: config,
     };
-    // TODO: Encrypt here
+
+    let json_payload = serde_json::to_string(&update_payload)
+        .map_err(|e| format!("Failed to serialize payload: {}", e))?;
+    let encrypted_payload = encryption_client.encrypt_data(&json_payload);
+ 
     let post_url = format!("{}/preferences/update", SERVER_URL);
     let update_resp = client
         .post(&post_url)
-        .json(&update_payload)
+        .json(&encrypted_payload)
         .send()
         .await
         .map_err(|e| format!("Failed to send update to server: {}", e))?;
@@ -440,7 +439,7 @@ async fn fetch_preferences(app_handle: tauri::AppHandle, encryption_instance: St
 	    return Err(format!("Failed to fetch username."));
         }
     };
-    // TODO: Decrypt here
+
     let mut url = Url::parse(&format!("{}/preferences/{}", SERVER_URL, username)).unwrap();
     url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
     let client = Client::new();

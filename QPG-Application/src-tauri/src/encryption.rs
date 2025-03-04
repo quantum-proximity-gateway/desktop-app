@@ -35,6 +35,13 @@ pub struct EncryptionClient {
     pub client_id: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EncryptedData {
+    pub ciphertext_b64: String,
+    pub nonce_b64: String,
+    pub client_id: String
+}
+
 impl EncryptionClient {
 
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
@@ -117,6 +124,10 @@ impl EncryptionClient {
         
         Ok(result)
         */
+    }
+
+    pub fn encrypt_data(data: String) -> Result<EncryptedData, String> {
+        Ok(/* EncryptedData */)
     }
 
 }

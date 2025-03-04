@@ -18,6 +18,7 @@ const OLLAMA_BASE_URL: &str = "http://localhost:11434";
 const SERVER_URL: &str = "http://127.0.0.1:8000";
 
 struct OllamaInstance(TokioMutex<Ollama>);
+struct EncryptionClientInstance(TokioMutex<EncryptionClient>);
 struct ChatIDs(TokioMutex<HashMap<String, bool>>);
 
 #[tauri::command]
@@ -478,23 +479,27 @@ pub fn run() {
                 // Disable autostart
                 let _ = autostart_manager.disable();
             }
+            Ok(())
+        })
+        
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
+        .manage(EncryptionClientInstance(TokioMutex::new(
             block_on(async {
                 match EncryptionClient::new().await {
                     Ok(client) => {
                         println!("EncryptionClient created successfully!");
                         println!("Client ID: {}", client.client_id);
-                        // You can call other methods on the client instance here
+                        println!("Shared Secret {:?}", client.shared_secret);
+                        client
                     }
                     Err(e) => {
                         eprintln!("Failed to create EncryptionClient: {}", e);
+                        panic!("Failed to create EncryptionClient");
                     }
                 }
-            });
-            
-            Ok(())
-        })
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_opener::init())
+            })
+        )))
         .manage(OllamaInstance(TokioMutex::new(
 	    Ollama::new_with_history_from_url(
 	        Url::parse(OLLAMA_BASE_URL).unwrap(),

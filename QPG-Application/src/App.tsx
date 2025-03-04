@@ -84,10 +84,10 @@ function App() {
     if (isLoading || !prompt) { 
       return;
     }
-    if (!selectedModel) {
-      alert("Please select a model first");
-      return;
-    }
+    // if (!selectedModel) {
+    //   alert("Please select a model first");
+    //   return;
+    // }
     const userMessage = { sender: "user", text: prompt };
     setMessages([...messages, userMessage]);
     setPrompt("");

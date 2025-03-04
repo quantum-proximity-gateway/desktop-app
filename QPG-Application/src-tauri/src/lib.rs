@@ -125,6 +125,7 @@ async fn generate(
     println!("past username {:?}", username);
     
     // Fetch preferences
+    // TODO: Decrypt here
     let client = Client::new();
     let url = format!("{}/preferences/{}", SERVER_URL, username);
     let response = client
@@ -132,13 +133,13 @@ async fn generate(
 	.send()
 	.await
 	.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
-
+    
     println!("past response {:?}", response.status());
 
     if !response.status().is_success() {
         return Err(format!("Failed to fetch preferences: {}", response.status()));
     }
-
+    // TODO: Decrypt here
     let response_body = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
     println!("Response body: {}", response_body);
 
@@ -219,6 +220,7 @@ async fn update_json_current_value(
     base_command: &str,
     new_value_str: &str,
 ) -> Result<(), String> {
+    // TODO: Encrypt here
     let client = Client::new();
     let get_url = format!("{}/preferences/{}", SERVER_URL, username);
     let response = client
@@ -263,7 +265,7 @@ async fn update_json_current_value(
         username: username.to_string(),
         preferences: config,
     };
-
+    // TODO: Encrypt here
     let post_url = format!("{}/preferences/update", SERVER_URL);
     let update_resp = client
         .post(&post_url)
@@ -428,7 +430,7 @@ async fn fetch_preferences(app_handle: tauri::AppHandle) -> Result<AppConfig, St
 	    return Err(format!("Failed to fetch username."));
         }
     };
-
+    // TODO: Decrypt here
     let api_url = format!("{}/devices/{}/preferences", SERVER_URL, username);
     let client = Client::new();
 

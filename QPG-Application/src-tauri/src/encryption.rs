@@ -4,31 +4,32 @@ use kyberlib::*;
 use uuid::Uuid;
 use reqwest::Client;
 use serde_json::json;
+use rand::*;
 
-const SERVER_URL: &str = "http://127.0.0.1:8000";
+const SERVER_URL: &str = "https://f278-144-82-8-42.ngrok-free.app";
 
 #[derive(Serialize, Deserialize)]
 pub struct EncapsulationResult {
-    ciphertext_b64: String,
-    secret: Box<[u8]>,
+    pub ciphertext_b64: String,
+    pub secret: Box<[u8]>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SharedSecretInput {
-    client_id: String,
-    public_key_b64: String
+    pub client_id: String,
+    pub public_key_b64: String
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EncryptionInput {
-    plaintext: String,
-    public_key_b64: String
+    pub plaintext: String,
+    pub public_key_b64: String
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EncryptionResult {
-    plaintext: String,
-    public_key_b64: String
+    pub plaintext: String,
+    pub public_key_b64: String
 }
 
 pub struct EncryptionClient {
@@ -40,21 +41,19 @@ impl EncryptionClient {
 
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let client_id = Uuid::new_v4().to_string();
+	let public_key_b64 = Self::initiate_kem(&client_id).await?;
 
         let data = SharedSecretInput {
             client_id: client_id.clone(),
-            public_key_b64: Self::initiate_kem(&client_id).await?,
+            public_key_b64,
         };
 
         let results: EncapsulationResult = Self::generate_shared_secret(data)?;
-        let ciphertext_b64 = results.ciphertext_b64;
 
-        Self::complete_kem(&client_id, ciphertext_b64).await?;
-        let shared_secret = results.secret;
-        
+        Self::complete_kem(&client_id, &results.ciphertext_b64).await?;
         
         Ok(Self {
-            shared_secret,
+            shared_secret: results.secret,
             client_id,
         })
     }
@@ -72,6 +71,7 @@ impl EncryptionClient {
             println!("Request successful");
             let json_response = response.json::<serde_json::Value>().await.map_err(|e| e.to_string())?;
             let public_key_b64 = json_response["public_key_b64"].as_str().ok_or("public_key_b64 not found in response")?.to_string();
+	    println!("initiate kem - got public key");
             return Ok(public_key_b64);
         } else {
             println!("Request failed with status: {}", response.status());
@@ -79,7 +79,7 @@ impl EncryptionClient {
         }
     }
 
-    pub async fn complete_kem(client_id: &str, ciphertext_b64: String) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn complete_kem(client_id: &str, ciphertext_b64: &str) -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::new();
         let response = client.post(format!("{}/kem/complete", SERVER_URL))
             .json(&json!({
@@ -90,8 +90,7 @@ impl EncryptionClient {
             .await?;
 
         if response.status().is_success() {
-            println!("{:?}", response.json().await?);
-            println!("Request successful");
+            println!("Request successful - {:?}", response.json::<serde_json::Value>().await?);
         } else {
             println!("Request failed with status: {}", response.status());
         }
@@ -99,18 +98,24 @@ impl EncryptionClient {
         Ok(())
     }
 
-    pub fn generate_shared_secret(data: SharedSecretInput) -> Result<EncapsulationResult, String> {
+    pub fn generate_shared_secret(data: SharedSecretInput) -> Result<EncapsulationResult, Box<dyn std::error::Error>> {
+	let mut rng = thread_rng();
         let pk_bytes = BASE64_STANDARD.decode(data.public_key_b64).map_err(|e| format!("Failed to decode base64: {:?}", e))?;
-        let pk_boxed: Box<[u8]> = pk_bytes.into_boxed_slice();
-        let encapsulation_result = encapsulate(pk_boxed).map_err(|e| format!("{:?}", e))?; // ML-KEM-512
-        let ciphertext_b64: String = BASE64_STANDARD.encode(encapsulation_result.ciphertext());
+
+	println!("pk_bytes: {:#?}", pk_bytes);
+
+	let (ciphertext, shared_secret) = encapsulate(&pk_bytes, &mut rng).map_err(|e| format!("Encapsulation error: {:?}", e))?;
+        let ciphertext_b64: String = BASE64_STANDARD.encode(ciphertext);
+	let secret = shared_secret.to_vec().into_boxed_slice();
     
-        let result = EncapsulationResult {
-            ciphertext_b64: ciphertext_b64,
-            secret: encapsulation_result.sharedSecret()
-        };
-        Ok(result)
+        Ok(EncapsulationResult {
+            ciphertext_b64,
+            secret
+	})
+    }
+
+    pub fn get_shared_secret(&self) -> &[u8] {
+	&self.shared_secret
     }
 
 }
-

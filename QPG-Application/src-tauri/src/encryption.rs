@@ -1,16 +1,15 @@
 use serde::{Serialize, Deserialize};
 use base64::prelude::*;
-use kemkem::{mlkem::*, params::*, serialize:: *};
 use uuid::Uuid;
 use reqwest::Client;
 use serde_json::json;
-use rand::{rngs::{OsRng, StdRng}, SeedableRng};
+use orion::hazardous::kem::mlkem512::{MlKem512, EncapsulationKey};
 const SERVER_URL: &str = "http://127.0.0.1:8000";
 
 #[derive(Serialize, Deserialize)]
 pub struct EncapsulationResult {
     pub ciphertext_b64: String,
-    pub secret: Box<[u8]>,
+    pub secret: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,7 +31,7 @@ pub struct EncryptionResult {
 }
 
 pub struct EncryptionClient {
-    pub shared_secret: Box<[u8]>,
+    pub shared_secret: Vec<u8>,
     pub client_id: String,
 }
 
@@ -40,7 +39,7 @@ impl EncryptionClient {
 
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let client_id = Uuid::new_v4().to_string();
-	let public_key_b64 = Self::initiate_kem(&client_id).await?;
+	    let public_key_b64 = Self::initiate_kem(&client_id).await?;
 
         let data = SharedSecretInput {
             client_id: client_id.clone(),
@@ -99,20 +98,25 @@ impl EncryptionClient {
     }
 
     pub fn generate_shared_secret(data: SharedSecretInput) -> Result<EncapsulationResult, String> {
-        let rng = StdRng::from_rng(OsRng::new().map_err(|e| format!("Failed to create OsRng: {:?}", e))?)
-            .map_err(|e| format!("Failed to create StdRng: {:?}", e))?;
-        let pk_bytes = BASE64_STANDARD.decode(data.public_key_b64).map_err(|e| format!("Failed to decode base64: {:?}", e))?;
+        let pk_bytes: Vec<u8> = BASE64_STANDARD.decode(data.public_key_b64).map_err(|e| format!("Failed to decode base64: {:?}", e))?;
+        let ek = EncapsulationKey::from_slice(&pk_bytes).map_err(|e| format!("Failed to create encapsulation key: {:?}", e))?;
+        let (secret, ciphertext) = MlKem512::encap(&ek).map_err(|e| format!("Failed to encapsulate: {:?}", e))?;
+        let result = EncapsulationResult {
+            ciphertext_b64: BASE64_STANDARD.encode(ciphertext),
+            secret: secret.unprotected_as_bytes().to_vec()
+        };
+        Ok(result)
+        /*
+        let pk_bytes: Vec<u8> = BASE64_STANDARD.decode(data.public_key_b64).map_err(|e| format!("Failed to decode base64: {:?}", e))?;
         let pk_bits = bitvec::vec::BitVec::from_vec(pk_bytes.clone());
         let ek = MlKemEncapsulationKey::<{MlKem512::K}>::deserialize(&pk_bits);
         let (key, ciphertext) = encaps::<MlKem512>(ek); // ML-KEM-512
         let c_bytes = ciphertext.serialize();
         let ciphertext_b64: String = BASE64_STANDARD.encode(c_bytes.into_vec());
     
-        let result = EncapsulationResult {
-            ciphertext_b64: ciphertext_b64,
-            secret: key.into()
-        };
+        
         Ok(result)
+        */
     }
 
 }

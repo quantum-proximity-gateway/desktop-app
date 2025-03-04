@@ -1,4 +1,5 @@
 use ollama_rs::generation::chat::MessageRole;
+use tauri::async_runtime::block_on;
 use url::Url;
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
 use ollama_rs::Ollama;
@@ -8,6 +9,10 @@ use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
+
+mod encryption;
+use encryption::EncryptionClient;
+
 
 const OLLAMA_BASE_URL: &str = "http://localhost:11434";
 const SERVER_URL: &str = "http://127.0.0.1:8000";
@@ -473,6 +478,19 @@ pub fn run() {
                 // Disable autostart
                 let _ = autostart_manager.disable();
             }
+            block_on(async {
+                match EncryptionClient::new().await {
+                    Ok(client) => {
+                        println!("EncryptionClient created successfully!");
+                        println!("Client ID: {}", client.client_id);
+                        // You can call other methods on the client instance here
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to create EncryptionClient: {}", e);
+                    }
+                }
+            });
+            
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())

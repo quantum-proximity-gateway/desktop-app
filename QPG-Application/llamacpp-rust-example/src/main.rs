@@ -7,70 +7,88 @@ use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 use std::io::Write;
 
-#[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
-fn main() {
-    let model_path = "models/granite-3.0-8b-instruct-IQ4_XS.gguf";
-    let backend = LlamaBackend::init().unwrap();
-    let params = LlamaModelParams::default();
+pub struct LlamaGenerator {
+    backend: LlamaBackend,
+    model: LlamaModel,
+}
 
-    let prompt =
-        "<|im_start|>user\nHello! How are you?<|im_end|>\n<|im_start|>assistant\n".to_string();
-    LlamaContextParams::default();
-    let model =
-        LlamaModel::load_from_file(&backend, model_path, &params).expect("unable to load model");
-    let ctx_params = LlamaContextParams::default();
-    let mut ctx = model
-        .new_context(&backend, ctx_params)
-        .expect("unable to create the llama_context");
-    let tokens_list = model
-        .str_to_token(&prompt, AddBos::Always)
-        .unwrap_or_else(|_| panic!("failed to tokenize {prompt}"));
-    let n_len = 64;
-
-    // Create a llama_batch with size 512
-    // We use this object to submit token data for decoding
-    let mut batch = LlamaBatch::new(512, 1);
-
-    let last_index = tokens_list.len() as i32 - 1;
-    for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
-        // llama_decode will output logits only for the last token of the prompt
-        let is_last = i == last_index;
-        batch.add(token, i, &[0], is_last).unwrap();
+impl LlamaGenerator {
+    /// Loads the model from the given path and returns a reusable generator.
+    pub fn new(model_path: &str) -> Self {
+        let backend = LlamaBackend::init().unwrap();
+        let params = LlamaModelParams::default();
+        let model = LlamaModel::load_from_file(&backend, model_path, &params)
+            .expect("unable to load model");
+        Self { backend, model }
     }
-    ctx.decode(&mut batch).expect("llama_decode() failed");
 
-    let mut n_cur = batch.n_tokens();
+    /// Generates text from the given prompt.
+    ///
+    /// This method creates a new context for each prompt, tokenizes the prompt, and then
+    /// iteratively decodes tokens until either an end-of-stream token is produced or a fixed
+    /// token limit is reached.
+    pub fn generate(&self, prompt: &str) -> String {
+        let ctx_params = LlamaContextParams::default();
+        let mut ctx = self.model.new_context(&self.backend, ctx_params)
+            .expect("unable to create the llama_context");
 
-    // The `Decoder`
-    let mut decoder = encoding_rs::UTF_8.new_decoder();
-    let mut sampler = LlamaSampler::greedy();
+        // Tokenize the input prompt.
+        let tokens_list = self.model
+            .str_to_token(prompt, AddBos::Always)
+            .unwrap_or_else(|_| panic!("failed to tokenize {}", prompt));
 
-    while n_cur <= n_len {
-        // Sample the next token
-        {
+        // Set a fixed generation length (here: 64 tokens)
+        let n_len = 64;
+        let mut batch = LlamaBatch::new(512, 1);
+        let last_index = tokens_list.len() as i32 - 1;
+
+        // Prepare the batch with the prompt tokens.
+        for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
+            let is_last = i == last_index;
+            batch.add(token, i, &[0], is_last).unwrap();
+        }
+        ctx.decode(&mut batch).expect("llama_decode() failed");
+
+        let mut n_cur = batch.n_tokens();
+        let mut decoder = encoding_rs::UTF_8.new_decoder();
+        let mut sampler = LlamaSampler::greedy();
+        let mut output = String::new();
+
+        // Generate tokens until reaching the desired length or an EOS token.
+        while n_cur <= n_len {
             let token = sampler.sample(&ctx, batch.n_tokens() - 1);
-
             sampler.accept(token);
 
-            // Is it an end of stream?
-            if token == model.token_eos() {
-                eprintln!();
+            // Stop if end-of-stream token is reached.
+            if token == self.model.token_eos() {
                 break;
             }
 
-            let output_bytes = model.token_to_bytes(token, Special::Tokenize).unwrap();
-            // Use `Decoder.decode_to_string()` to avoid the intermediate buffer
+            let output_bytes = self.model
+                .token_to_bytes(token, Special::Tokenize)
+                .expect("token_to_bytes failed");
+
             let mut output_string = String::with_capacity(32);
-            let _decode_result = decoder.decode_to_string(&output_bytes, &mut output_string, false);
-            print!("{output_string}");
-            std::io::stdout().flush().unwrap();
+            let _ = decoder.decode_to_string(&output_bytes, &mut output_string, false);
+            output.push_str(&output_string);
 
             batch.clear();
             batch.add(token, n_cur, &[0], true).unwrap();
+            n_cur += 1;
+            ctx.decode(&mut batch).expect("failed to eval");
         }
 
-        n_cur += 1;
-
-        ctx.decode(&mut batch).expect("failed to eval");
+        output
     }
+}
+
+fn main() {
+    // Initialize the generator once.
+    let generator = LlamaGenerator::new("models/granite-3.0-8b-instruct-IQ4_XS.gguf");
+
+    // Example prompt.
+    let prompt = "<|im_start|>user\nHello! How are you?<|im_end|>\n<|im_start|>assistant\n";
+    let output = generator.generate(prompt);
+
+    println!("\nFinal output: {}", output);
 }

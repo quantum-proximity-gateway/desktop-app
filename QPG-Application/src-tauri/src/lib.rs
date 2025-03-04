@@ -11,7 +11,7 @@ use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 
 mod encryption;
-use encryption::EncryptionClient;
+use encryption::{DecryptData, EncryptionClient};
 
 
 const OLLAMA_BASE_URL: &str = "http://localhost:11434";
@@ -76,7 +76,7 @@ struct GenerateResult {
     command: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct PreferencesAPIResponse {
     preferences: serde_json::Value,
 }
@@ -105,6 +105,7 @@ async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 async fn generate(
     request: ChatRequest,
+    encryption_instance: State<'_, EncryptionClientInstance>,
     g_ollama: State<'_, OllamaInstance>,
     seen_chats: State<'_, ChatIDs>,
     app_handle: tauri::AppHandle
@@ -125,11 +126,12 @@ async fn generate(
     println!("past username {:?}", username);
     
     // Fetch preferences
-    // TODO: Decrypt here
+    let encryption_client = encryption_instance.0.lock().await;
     let client = Client::new();
-    let url = format!("{}/preferences/{}", SERVER_URL, username);
+    let mut url = Url::parse(&format!("{}/preferences/{}", SERVER_URL, username)).unwrap();
+    url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
     let response = client
-	.get(&url)
+	.get(url)
 	.send()
 	.await
 	.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
@@ -139,13 +141,16 @@ async fn generate(
     if !response.status().is_success() {
         return Err(format!("Failed to fetch preferences: {}", response.status()));
     }
-    // TODO: Decrypt here
-    let response_body = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
-    println!("Response body: {}", response_body);
+
+    println!("Decrypting");
+    let response_body: String = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
+    let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let decrypted_body: String = encryption_client.decrypt_data(encrypted_body)?;
+    println!("Decrypted body: {}", decrypted_body);
 
 
     // Some issue here maybe reuse fetch_username
-    let preferences: PreferencesAPIResponse = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let preferences: PreferencesAPIResponse = serde_json::from_str(&decrypted_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
     println!("past prefs");
     let json_example = preferences.preferences.to_string();
     println!("past json eg");
@@ -219,6 +224,7 @@ async fn update_json_current_value(
     username: &str,
     base_command: &str,
     new_value_str: &str,
+    encryption_instance: State<'_, EncryptionClientInstance>,
 ) -> Result<(), String> {
     // TODO: Encrypt here
     let client = Client::new();
@@ -308,7 +314,8 @@ fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultVa
 #[tauri::command]
 async fn execute_command(
     command: String,
-    app_handle: tauri::AppHandle
+    app_handle: tauri::AppHandle,
+    encryption_instance: State<'_, EncryptionClientInstance>
 ) -> Result<(), String> {
     // execute shell command https://v2.tauri.app/plugin/shell/
     let shell = app_handle.shell();
@@ -317,7 +324,7 @@ async fn execute_command(
         Ok(username) => username,
         Err(e) => {
             println!("Warning: failed to get username from whoami: {}", e);
-	    return Err(format!("Failed to fetch username."));
+        return Err(format!("Failed to fetch username."));
         }
     };
 
@@ -325,10 +332,10 @@ async fn execute_command(
 
     let command_parts: Vec<&str> = command.split_whitespace().collect();
     if let Some((cmd, args)) = command_parts.split_first() {
-	match shell.command(cmd).args(args).output().await { // so unsafe we need to whitelist only gsettings
+    match shell.command(cmd).args(args).output().await { // so unsafe we need to whitelist only gsettings
             Ok(output) => {
                 if output.status.success() {
-		    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+            let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
                     println!("Command result: {:?}", stdout_str);
 
                     if !args.is_empty() {
@@ -342,9 +349,10 @@ async fn execute_command(
                             &username,
                             &base_command_str,
                             &new_value_str,
+                            encryption_instance.clone()
                         )
                         .await?;
-	        	    }
+                    }
                 } else {
                     println!("Exit with code: {}", output.status.code().unwrap());
                 }
@@ -405,9 +413,11 @@ pub struct Setting {
 pub type AppConfig = HashMap<String, Setting>;
 
 #[tauri::command]
-async fn fetch_preferences(app_handle: tauri::AppHandle) -> Result<AppConfig, String> {
+async fn fetch_preferences(app_handle: tauri::AppHandle, encryption_instance: State<'_, EncryptionClientInstance>,) -> Result<PreferencesAPIResponse, String> {
     use std::fs;
     use serde_json;
+
+    let encryption_client = encryption_instance.0.lock().await;
 
     fn load_default_app_config(path: &str) -> Result<AppConfig, Box<dyn std::error::Error>> {
         let file_contents = fs::read_to_string(path)?;
@@ -431,27 +441,31 @@ async fn fetch_preferences(app_handle: tauri::AppHandle) -> Result<AppConfig, St
         }
     };
     // TODO: Decrypt here
-    let api_url = format!("{}/devices/{}/preferences", SERVER_URL, username);
+    let mut url = Url::parse(&format!("{}/preferences/{}", SERVER_URL, username)).unwrap();
+    url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
     let client = Client::new();
 
-    match client.get(api_url).send().await {
+    match client.get(url).send().await {
         Ok(response) => {
             if response.status().is_success() {
-                match response.json::<AppConfig>().await {
-                    Ok(preferences) => Ok(preferences),
-                    Err(e) => {
-                        println!("Failed to parse preferences: {}", e);
-                        Ok(default_commands) // Placeholder data
-                    }
-                }
+                let response_body: String = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
+                let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+                let decrypted_body: String = encryption_client.decrypt_data(encrypted_body)?;
+                let preferences: PreferencesAPIResponse = serde_json::from_str(&decrypted_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+                Ok(preferences)
+                
             } else {
                 println!("Failed to fetch preferences. Status: {}", response.status());
-                Ok(default_commands) // Placeholder data
+                Ok(PreferencesAPIResponse {
+                    preferences: serde_json::to_value(default_commands).unwrap_or_default(),
+                })
             }
         }
         Err(e) => {
             println!("HTTP request failed: {}", e);
-            Ok(default_commands) // Placeholder data
+            Ok(PreferencesAPIResponse {
+                preferences: serde_json::to_value(default_commands).unwrap_or_default(),
+            })
         }
     }
 }

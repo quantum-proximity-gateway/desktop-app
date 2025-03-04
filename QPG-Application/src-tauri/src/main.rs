@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    qpg_application_lib::run()
+    qpg_application_lib::run();
 }

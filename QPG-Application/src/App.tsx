@@ -70,11 +70,15 @@ function App() {
   };
 
   type AppConfig = Record<string, Settings>;
+  
+  interface PreferencesAPIResponse {
+    preferences: AppConfig;
+  } 
 
   async function fetchPreferences() {
     try {
-      const prefs = await invoke<AppConfig>("fetch_preferences");
-      setPreferences(prefs);
+      const prefs = await invoke<PreferencesAPIResponse>("fetch_preferences");
+      setPreferences(prefs.preferences);
     } catch (error) {
       console.error("Failed to fetch preferences:", error);
     }

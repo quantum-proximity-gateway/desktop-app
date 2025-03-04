@@ -8,6 +8,8 @@ use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
+use llama_cpp::{LlamaModel, LlamaParams, SessionParams};
+use llama_cpp::standard_sampler::StandardSampler;
 
 const OLLAMA_BASE_URL: &str = "http://localhost:11434";
 const SERVER_URL: &str = "http://127.0.0.1:8000";
@@ -452,6 +454,8 @@ async fn fetch_preferences(app_handle: tauri::AppHandle) -> Result<AppConfig, St
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let model = LlamaModel::load_from_file("models/granite-3.0-8b-instruct-IQ4_XS.gguf", LlamaParams::default()).expect("Could not load model");
+
     tauri::Builder::default()
         .setup(|app| {
             #[cfg(desktop)]

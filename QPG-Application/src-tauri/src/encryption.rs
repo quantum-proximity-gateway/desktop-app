@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde_json::json;
 use orion::hazardous::kem::mlkem512::{MlKem512, EncapsulationKey};
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng}, Aes256Gcm, AesGcm, Key, Nonce // Or `Aes128Gcm`
+    aead::{Aead, AeadCore, KeyInit, OsRng}, aes::Aes256, Aes256Gcm, AesGcm, Key, Nonce // Or `Aes128Gcm`
 };
 
 const SERVER_URL: &str = "http://127.0.0.1:8000";
@@ -44,6 +44,12 @@ pub struct EncryptedData {
     pub ciphertext_b64: String,
     pub nonce_b64: String,
     pub client_id: String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DecryptData {
+    pub ciphertext_b64: String,
+    pub nonce_b64: String,
 }
 
 impl EncryptionClient {
@@ -142,6 +148,24 @@ impl EncryptionClient {
             nonce_b64,
             client_id: self.client_id.clone()
         })
+    }
+
+    pub fn decrypt_data(&self, data: DecryptData) -> Result<String, String> {
+        let key = Key::<Aes256Gcm>::from_slice(&self.shared_secret);
+        let cipher = Aes256Gcm::new(&key);
+        let nonce_vec = BASE64_STANDARD.decode(&data.nonce_b64)
+            .map_err(|e| format!("Failed to decode nonce: {}", e))?;
+        let ciphertext = BASE64_STANDARD.decode(&data.ciphertext_b64)
+            .map_err(|e| format!("Failed to decode ciphertext: {}", e))?;
+        
+        let nonce = Nonce::from_slice(&nonce_vec);
+        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref())
+            .map_err(|e| format!("Decryption error: {}", e))?;
+        
+        let plaintext_str = String::from_utf8(plaintext)
+            .map_err(|e| format!("Invalid UTF-8: {}", e))?;
+            
+        Ok(plaintext_str)
     }
 
 }

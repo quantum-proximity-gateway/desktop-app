@@ -4,6 +4,10 @@ use uuid::Uuid;
 use reqwest::Client;
 use serde_json::json;
 use orion::hazardous::kem::mlkem512::{MlKem512, EncapsulationKey};
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng}, Aes256Gcm, AesGcm, Key, Nonce // Or `Aes128Gcm`
+};
+
 const SERVER_URL: &str = "http://127.0.0.1:8000";
 
 #[derive(Serialize, Deserialize)]
@@ -126,8 +130,18 @@ impl EncryptionClient {
         */
     }
 
-    pub fn encrypt_data(data: String) -> Result<EncryptedData, String> {
-        Ok(/* EncryptedData */)
+    pub fn encrypt_data(&self, data: &str) -> Result<EncryptedData, String> {
+        let key = Key::<Aes256Gcm>::from_slice(&self.shared_secret);
+        let cipher = Aes256Gcm::new(key);
+        let nonce = Aes256Gcm::generate_nonce(OsRng);
+        let ciphertext = cipher.encrypt(&nonce, data.as_bytes())
+            .map_err(|e| format!("Encryption error: {}", e))?;
+        let nonce_b64 = BASE64_STANDARD.encode(&nonce);
+        Ok(EncryptedData {
+            ciphertext_b64: BASE64_STANDARD.encode(&ciphertext),
+            nonce_b64,
+            client_id: self.client_id.clone()
+        })
     }
 
 }

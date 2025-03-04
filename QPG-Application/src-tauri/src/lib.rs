@@ -502,7 +502,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(EncryptionClientInstance(TokioMutex::new(
             block_on(async {
-                match EncryptionClient::new().await {
+                match EncryptionClient::new(SERVER_URL).await {
                     Ok(client) => {
                         println!("EncryptionClient created successfully!");
                         println!("Client ID: {}", client.client_id);

@@ -8,7 +8,7 @@ use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng}, aes::Aes256, Aes256Gcm, AesGcm, Key, Nonce // Or `Aes128Gcm`
 };
 
-const SERVER_URL: &str = "http://127.0.0.1:8000";
+
 
 #[derive(Serialize, Deserialize)]
 pub struct EncapsulationResult {
@@ -54,9 +54,9 @@ pub struct DecryptData {
 
 impl EncryptionClient {
 
-    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(server_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let client_id = Uuid::new_v4().to_string();
-	    let public_key_b64 = Self::initiate_kem(&client_id).await?;
+	    let public_key_b64 = Self::initiate_kem(&client_id, server_url).await?;
 
         let data = SharedSecretInput {
             client_id: client_id.clone(),
@@ -65,7 +65,7 @@ impl EncryptionClient {
 
         let results: EncapsulationResult = Self::generate_shared_secret(data)?;
 
-        Self::complete_kem(&client_id, &results.ciphertext_b64).await?;
+        Self::complete_kem(&client_id, &results.ciphertext_b64, server_url).await?;
         
         Ok(Self {
             shared_secret: results.secret,
@@ -73,9 +73,9 @@ impl EncryptionClient {
         })
     }
 
-    pub async fn initiate_kem(client_id: &str) -> Result<String, String> {
+    pub async fn initiate_kem(client_id: &str, server_url: &str) -> Result<String, String> {
         let client = Client::new();
-        let response = client.post(format!("{}/kem/initiate", SERVER_URL))
+        let response = client.post(format!("{}/kem/initiate", server_url))
             .json(&json!({
                 "client_id": client_id,
             }))
@@ -94,9 +94,9 @@ impl EncryptionClient {
         }
     }
 
-    pub async fn complete_kem(client_id: &str, ciphertext_b64: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn complete_kem(client_id: &str, ciphertext_b64: &str, server_url: &str) -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::new();
-        let response = client.post(format!("{}/kem/complete", SERVER_URL))
+        let response = client.post(format!("{}/kem/complete", server_url))
             .json(&json!({
                 "client_id": client_id,
                 "ciphertext_b64": ciphertext_b64

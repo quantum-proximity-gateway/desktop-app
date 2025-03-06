@@ -98,8 +98,42 @@ impl LlamaGenerator {
     }
 }
 
-// #[tauri::command]
-// async fn list_models() -> Result<Vec<String>, String> {
+#[tauri::command]
+async fn list_models() -> Result<Vec<String>, String> {
+    let models_dir = "models";
+    
+    let dir = match std::fs::read_dir(models_dir) {
+        Ok(dir) => dir,
+        Err(e) => return Err(format!("Failed to read models directory: {}", e)),
+    };
+    
+    // Collect model filenames, filtering for .gguf files
+    let models: Vec<String> = dir
+        .filter_map(|entry| {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if let Some(extension) = path.extension() {
+                    if extension == "gguf" {
+                        // Get just the filename without the extension
+                        if let Some(name) = path.file_stem() {
+                            return Some(name.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .collect();
+    
+    if models.is_empty() {
+        println!("No models found in the models directory");
+        return Err("No models found".to_string());
+    }
+    
+    println!("Found {} models: {:?}", models.len(), models);
+    Ok(models)
+}
+
 //     let ollama = Ollama::new_with_history_from_url(
 //         Url::parse(OLLAMA_BASE_URL).unwrap(),
 //         50,
@@ -632,7 +666,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![generate, fetch_preferences, execute_command, get_username])
+        .invoke_handler(tauri::generate_handler![generate, fetch_preferences, execute_command, get_username, list_models])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

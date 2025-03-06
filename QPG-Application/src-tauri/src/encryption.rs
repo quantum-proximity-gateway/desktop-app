@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde_json::json;
 use orion::hazardous::kem::mlkem512::{MlKem512, EncapsulationKey};
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng}, aes::Aes256, Aes256Gcm, AesGcm, Key, Nonce // Or `Aes128Gcm`
+    aead::{Aead, AeadCore, KeyInit, OsRng}, Aes256Gcm, Key, Nonce // Or `Aes128Gcm`
 };
 
 

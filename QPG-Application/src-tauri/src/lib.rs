@@ -15,7 +15,7 @@ use encryption::{DecryptData, EncryptionClient};
 
 
 const OLLAMA_BASE_URL: &str = "http://localhost:11434";
-const SERVER_URL: &str = "http://127.0.0.1:8000";
+const SERVER_URL: &str = "https://47f4-5-151-28-147.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct EncryptionClientInstance(TokioMutex<EncryptionClient>);

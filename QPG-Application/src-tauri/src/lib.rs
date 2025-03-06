@@ -378,7 +378,7 @@ the final JSON object, like:
     );
     println!("Combined prompt: {}", combined_prompt);
 
-    // Create a new LlamaGenerator instance (model path is hardcoded per your example)
+    // Create a new LlamaGenerator instance
     let generator = LlamaGenerator::new("models/granite-3.0-8b-instruct-IQ4_XS.gguf");
 
     // Generate output synchronously using your generator.

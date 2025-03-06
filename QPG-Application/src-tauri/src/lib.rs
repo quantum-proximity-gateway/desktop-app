@@ -16,6 +16,11 @@ use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 use std::io::Write;
+use std::sync::Mutex;
+use std::sync::OnceLock;
+use std::fmt;
+
+static GENERATOR: OnceLock<Mutex<LlamaGenerator>> = OnceLock::new();
 
 // const OLLAMA_BASE_URL: &str = "http://localhost:11434";
 const SERVER_URL: &str = "https://8c1d-5-151-28-147.ngrok-free.app";
@@ -95,6 +100,13 @@ impl LlamaGenerator {
         }
 
         output
+    }
+}
+
+impl fmt::Debug for LlamaGenerator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LlamaGenerator")
+         .finish()
     }
 }
 
@@ -378,8 +390,8 @@ the final JSON object, like:
     );
     println!("Combined prompt: {}", combined_prompt);
 
-    // Create a new LlamaGenerator instance
-    let generator = LlamaGenerator::new("models/granite-3.0-8b-instruct-IQ4_XS.gguf");
+    let generator = GENERATOR.get().unwrap().lock().unwrap();
+    let response = generator.generate(&combined_prompt);
 
     // Generate output synchronously using your generator.
     let output = generator.generate(&combined_prompt);
@@ -641,6 +653,8 @@ async fn fetch_preferences(app_handle: tauri::AppHandle) -> Result<AppConfig, St
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    GENERATOR.set(Mutex::new(LlamaGenerator::new("models/granite-3.0-8b-instruct-IQ2_M.gguf"))).unwrap();
+
     tauri::Builder::default()
         .setup(|app| {
             #[cfg(desktop)]

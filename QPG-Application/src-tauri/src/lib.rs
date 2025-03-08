@@ -15,7 +15,7 @@ use encryption::{DecryptData, EncryptionClient};
 
 
 const OLLAMA_BASE_URL: &str = "http://localhost:11434";
-const SERVER_URL: &str = "https://47f4-5-151-28-147.ngrok-free.app";
+const SERVER_URL: &str = "https://2f3f-5-151-28-149.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct EncryptionClientInstance(TokioMutex<EncryptionClient>);
@@ -87,6 +87,50 @@ struct UpdateJSONPreferencesRequest {
     preferences: AppConfig,
 }
 
+#[cfg(target_os = "linux")]
+fn get_linux_gui() -> Option<String> {
+    if let Ok(desktop) = std::env::var("XDG_CURRENT_DESKTOP") {
+	if desktop.to_lowercase().contains("gnome") {
+	    return Some("gnome".to_string());
+	}
+	return Some(desktop);
+    }
+
+    if let Ok(session) = std::env::var("DESKTOP_SESSION") {
+	if session.to_lowercase().contains("gnome") {
+	    return Some("gnome".to_string());
+	}
+	return Some(session);
+    }
+
+    None
+}
+
+#[tauri::command]
+fn get_platform_info() -> String {
+    #[cfg(target_os = "macos")] {
+	return "macos".into();
+    }
+
+    #[cfg(target_os = "windows")] {
+	return "windows".into();
+    }
+
+    #[cfg(target_os = "linux")] {
+	let frontend_env = get_linux_gui();
+
+	if let Some(env) = frontend_env {
+	    if env.to_lowercase().contains("gnome") {
+		return "gnome".into();
+	    } else {
+		return format!("linux-{env}").into();
+	    }
+	} else {
+	    return "linux-unknown".into();
+	}
+    }
+}
+
 #[tauri::command]
 async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
     let shell = app_handle.shell();
@@ -124,6 +168,9 @@ async fn generate(
     };
 
     println!("past username {:?}", username);
+
+    let platform_info = get_platform_info();
+    println!("Platform: {}", platform_info);
     
     // Fetch preferences
     let encryption_client = encryption_instance.0.lock().await;

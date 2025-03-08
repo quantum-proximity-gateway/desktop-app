@@ -11,7 +11,6 @@ use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
-
 mod encryption;
 use encryption::{DecryptData, EncryptionClient};
 
@@ -177,7 +176,6 @@ async fn generate(
     app_handle: tauri::AppHandle
 ) -> Result<GenerateResult, String> {
 
-    
     println!("Generating response for {:?}", request);
 
     // Fetch username using whomai to fetch user's preferences
@@ -194,35 +192,10 @@ async fn generate(
     let platform_info = get_platform_info();
     println!("Platform: {}", platform_info);
     
-    // Fetch preferences
-    let encryption_client = encryption_instance.0.lock().await;
-    let client = Client::new();
-    let mut url = Url::parse(&format!("{}/preferences/{}", SERVER_URL, username)).unwrap();
-    url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
-    let response = client
-	.get(url)
-	.send()
-	.await
-	.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
-    
-    println!("past response {:?}", response.status());
-
-    if !response.status().is_success() {
-        return Err(format!("Failed to fetch preferences: {}", response.status()));
-    }
-
-    println!("Decrypting");
-    let response_body: String = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
-    println!("after response body: {:?}", response_body);
-    let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-    println!("after encrypted body");
-    let decrypted_body: String = encryption_client.decrypt_data(encrypted_body)?;
-    println!("Decrypted body: {}", decrypted_body);
-
     // Some issue here maybe reuse fetch_username
-    let json_example = match filter_json_by_env(&decrypted_body, &platform_info) {
+    let json_example = match fetch_preferences(&username, encryption_instance.clone(), &platform_info).await {
 	Ok(filtered) => filtered,
-	Err(e) => return Err(format!("Failed to filter JSON: {}", e)),
+	Err(e) => return Err(format!("Failed to fetch preferences: {}", e)),
     };
     println!("Filtered JSON for {}: {}", platform_info, json_example);
     
@@ -483,12 +456,20 @@ pub struct Setting {
 pub type AppConfig = HashMap<String, Setting>;
 
 #[tauri::command]
-async fn fetch_preferences(app_handle: tauri::AppHandle, encryption_instance: State<'_, EncryptionClientInstance>,) -> Result<PreferencesAPIResponse, String> {
+async fn fetch_preferences(
+    username: &str,
+    encryption_instance: State<'_, EncryptionClientInstance>,
+    env: &str,
+) -> Result<String, String> {
     use std::fs;
     use serde_json;
 
+    println!("[fetch_preferences] Fetching preferences for user: {}", username);
+    println!("[fetch_preferences] Platform environment: {}", env);
+
     let encryption_client = encryption_instance.0.lock().await;
 
+    // backup
     fn load_default_app_config(path: &str) -> Result<AppConfig, Box<dyn std::error::Error>> {
         let file_contents = fs::read_to_string(path)?;
         let config: AppConfig = serde_json::from_str(&file_contents)?;
@@ -496,18 +477,13 @@ async fn fetch_preferences(app_handle: tauri::AppHandle, encryption_instance: St
     }
 
     let default_commands = match load_default_app_config("src/json_example.json") {
-        Ok(config) => config,
-        Err(e) => {
-            println!("Failed to load defaults: {}", e);
-            HashMap::new()
+        Ok(config) => {
+            println!("[fetch_preferences] Successfully loaded default JSON.");
+            serde_json::to_value(config).unwrap_or_default()
         }
-    };
-
-    let username = match get_username(app_handle.clone()).await {
-        Ok(username) => username,
         Err(e) => {
-            println!("Warning: failed to get username from whoami: {}", e);
-	    return Err(format!("Failed to fetch username."));
+            println!("[fetch_preferences] Failed to load default JSON: {}", e);
+            serde_json::Value::Null
         }
     };
 
@@ -515,27 +491,50 @@ async fn fetch_preferences(app_handle: tauri::AppHandle, encryption_instance: St
     url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
     let client = Client::new();
 
-    match client.get(url).send().await {
+    println!("[fetch_preferences] Sending request to: {}", url);
+
+    let preferences_json = match client.get(url).send().await {
         Ok(response) => {
+            println!("[fetch_preferences] Server responded with status: {}", response.status());
+
             if response.status().is_success() {
-                let response_body: String = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
-                let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-                let decrypted_body: String = encryption_client.decrypt_data(encrypted_body)?;
-                let preferences: PreferencesAPIResponse = serde_json::from_str(&decrypted_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-                Ok(preferences)
-                
+                let response_body: String = response.text().await.map_err(|e| {
+                    println!("[fetch_preferences] Failed to read response body: {}", e);
+                    format!("Failed to read response body: {}", e)
+                })?;
+
+                println!("[fetch_preferences] Successfully received encrypted response.");
+
+                let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| {
+                    println!("[fetch_preferences] Failed to parse JSON: {}", e);
+                    format!("Failed to parse JSON: {}", e)
+                })?;
+
+                let decrypted_body = encryption_client.decrypt_data(encrypted_body)?;
+                println!("[fetch_preferences] Successfully decrypted preferences.");
+
+                decrypted_body
             } else {
-                println!("Failed to fetch preferences. Status: {}", response.status());
-                Ok(PreferencesAPIResponse {
-                    preferences: serde_json::to_value(default_commands).unwrap_or_default(),
-                })
+                println!("[fetch_preferences] Failed to fetch preferences. Using default JSON.");
+                serde_json::to_string_pretty(&default_commands).unwrap_or_default()
             }
         }
         Err(e) => {
-            println!("HTTP request failed: {}", e);
-            Ok(PreferencesAPIResponse {
-                preferences: serde_json::to_value(default_commands).unwrap_or_default(),
-            })
+            println!("[fetch_preferences] HTTP request failed: {}", e);
+            println!("[fetch_preferences] Falling back to local default JSON.");
+            serde_json::to_string_pretty(&default_commands).unwrap_or_default()
+        }
+    };
+
+    println!("[fetch_preferences] Filtering JSON for environment: {}", env);
+    match filter_json_by_env(&preferences_json, env) {
+        Ok(filtered_json) => {
+            println!("[fetch_preferences] Successfully filtered JSON.");
+            Ok(filtered_json)
+        }
+        Err(e) => {
+            println!("[fetch_preferences] Failed to filter JSON: {}", e);
+            Err(format!("Failed to filter JSON: {}", e))
         }
     }
 }

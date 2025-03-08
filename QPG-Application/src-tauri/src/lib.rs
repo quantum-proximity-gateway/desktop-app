@@ -213,7 +213,9 @@ async fn generate(
 
     println!("Decrypting");
     let response_body: String = response.text().await.map_err(|e| format!("Failed to read response body: {}", e))?;
+    println!("after response body: {:?}", response_body);
     let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    println!("after encrypted body");
     let decrypted_body: String = encryption_client.decrypt_data(encrypted_body)?;
     println!("Decrypted body: {}", decrypted_body);
 

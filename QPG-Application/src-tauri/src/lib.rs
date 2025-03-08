@@ -4,6 +4,8 @@ use url::Url;
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
 use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
+use serde_json;
+use serde_json::Value;
 use std::collections::HashMap;
 use tauri::State;
 use tokio::sync::Mutex as TokioMutex;
@@ -146,6 +148,26 @@ async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+fn filter_json_by_env(json_str: &str, env: &str) -> Result<String, serde_json::Error> {
+    let mut data: Value = serde_json::from_str(json_str)?;
+
+    if let Value::Object(ref mut categories) = data {
+	for (_, value) in categories.iter_mut() {
+	    if let Value::Object(ref mut settings) = value {
+		if let Some(Value::Object(commands)) = settings.get_mut("commands") {
+		    *commands = commands
+			.iter()
+			.filter(|(key, _)| key.as_str() == env)
+			.map(|(k, v)| (k.clone(), v.clone()))
+			.collect();
+		}
+	    }
+	}
+    }
+
+    serde_json::to_string_pretty(&data)
+}
+
 #[tauri::command]
 async fn generate(
     request: ChatRequest,
@@ -195,12 +217,12 @@ async fn generate(
     let decrypted_body: String = encryption_client.decrypt_data(encrypted_body)?;
     println!("Decrypted body: {}", decrypted_body);
 
-
     // Some issue here maybe reuse fetch_username
-    let preferences: PreferencesAPIResponse = serde_json::from_str(&decrypted_body).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-    println!("past prefs");
-    let json_example = preferences.preferences.to_string();
-    println!("past json eg");
+    let json_example = match filter_json_by_env(&decrypted_body, &platform_info) {
+	Ok(filtered) => filtered,
+	Err(e) => return Err(format!("Failed to filter JSON: {}", e)),
+    };
+    println!("Filtered JSON for {}: {}", platform_info, json_example);
     
     let sys_prompt = format!(
 	r#""You're an assistant that only replies in JSON format with keys "message" and "command".

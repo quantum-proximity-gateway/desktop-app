@@ -57,10 +57,11 @@ impl LlamaGenerator {
         let tokens_list = self.model
             .str_to_token(prompt, AddBos::Always)
             .unwrap_or_else(|_| panic!("failed to tokenize {}", prompt));
-
-        // Set a fixed generation length (here: 64 tokens)
-        let n_len = 64;
-        let mut batch = LlamaBatch::new(512, 1);
+        let n_tokens = tokens_list.len();
+        // Set a fixed generation length
+        let n_len = 1024;
+        let batch_size = (n_tokens + 512).max(8192);
+        let mut batch = LlamaBatch::new(batch_size, 1);
         let last_index = tokens_list.len() as i32 - 1;
 
         // Prepare the batch with the prompt tokens.
@@ -390,8 +391,9 @@ the final JSON object, like:
     );
     println!("Combined prompt: {}", combined_prompt);
 
-    let generator = GENERATOR.get().unwrap().lock().unwrap();
-    let response = generator.generate(&combined_prompt);
+    // Create a new LlamaGenerator instance (model path is hardcoded per your example)
+    let model_path = format!("models/{}.gguf", request.model);
+    let generator = LlamaGenerator::new(model_path.as_str());
 
     // Generate output synchronously using your generator.
     let output = generator.generate(&combined_prompt);

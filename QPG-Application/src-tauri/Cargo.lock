@@ -3181,11 +3181,13 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "strsim",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
  "tauri-plugin-opener",
  "tauri-plugin-shell",
+ "tfidf",
  "tokio",
  "url",
  "uuid",
@@ -4478,6 +4480,12 @@ dependencies = [
  "mac",
  "utf-8",
 ]
+
+[[package]]
+name = "tfidf"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bf9470a6583a839d7642730f11d8484e9a949362f93d51a795ea48a7a9af14c"
 
 [[package]]
 name = "thin-slice"

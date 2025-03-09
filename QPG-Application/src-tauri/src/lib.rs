@@ -13,10 +13,11 @@ use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 mod encryption;
 use encryption::{DecryptData, EncryptionClient};
+use strsim::jaro_winkler;
 
 
 const OLLAMA_BASE_URL: &str = "http://localhost:11434";
-const SERVER_URL: &str = "https://2f3f-5-151-28-149.ngrok-free.app";
+const SERVER_URL: &str = "https://460f-5-151-28-149.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct EncryptionClientInstance(TokioMutex<EncryptionClient>);
@@ -133,6 +134,35 @@ fn get_platform_info() -> String {
 }
 
 #[tauri::command]
+fn find_best_match(prompt: &str, json_str: &str) -> Option<String> {
+    let parsed_json: Value = serde_json::from_str(json_str).ok()?;
+    let mut best_match = None;
+    let mut highest_score = 0.0;
+
+    if let Value::Object(settings) = parsed_json {
+
+        for (key, value) in settings.iter() {
+            if let Value::Object(commands) = value.get("commands")? {
+                if !commands.is_empty() {
+		    
+                    let similarity = jaro_winkler(prompt, key);
+                    println!("Similarity of '{}' w/ '{}' => {}", prompt, key, similarity);
+
+                    if similarity > highest_score {
+                        highest_score = similarity;
+                        best_match = Some(key.clone());
+                    }
+		    
+                }
+            }
+        }
+	
+    }
+
+    best_match
+}
+
+#[tauri::command]
 async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
     let shell = app_handle.shell();
 
@@ -208,21 +238,22 @@ that has the following keys:
 - "message": Something you want to say to the user
 - "command": A gsettings accessibility command to run
 
-Below is a reference JSON that shows possible accessibility commands for GNOME:
+Below is a reference JSON that shows possible accessibility commands for the current environment ({}):
 
 {}
 
 The "current" field is the current value on the computer, while the "lower_bound",
 "upper_bound", and "default" fields represent the ranges/values in gsettings.
-Use this reference to inform your responses if needed. However, always reply with just
+Use this reference to inform your responses if needed. The prompt will always begin
+with a snippet of the reference JSON that is the most likely command the user is
+referring to, but this may not always be accurate. Remember, always reply with just
 the final JSON object, like:
 
 {{
   "message": "...",
   "command": "..."
-}}"#, json_example);
+}}"#, platform_info, json_example);
     
-    // Prompt the model
     let mut ollama = g_ollama.0.lock().await;
     let mut seen_chats = seen_chats.0.lock().await;
     
@@ -235,9 +266,32 @@ the final JSON object, like:
         }
     }
 
+    let best_match = find_best_match(&request.prompt, &json_example);
+    println!("Best match for prompt '{}': {:?}", request.prompt, best_match);
+
+    let best_match_json = match best_match.as_ref() {
+        Some(key) => {
+            let parsed_json: Value = serde_json::from_str(&json_example).unwrap_or(Value::Null);
+            if let Value::Object(mut settings) = parsed_json {
+                if let Some(matching_value) = settings.remove(key) {
+                    let mut new_obj = serde_json::Map::new();
+                    new_obj.insert(key.clone(), matching_value);
+                    serde_json::to_string_pretty(&Value::Object(new_obj)).unwrap_or_else(|_| json_example.clone())
+                } else {
+                    json_example.clone()
+                }
+            } else {
+                json_example.clone()
+            }
+        }
+        None => json_example.clone(),
+    };
+    println!("Filtered JSON for best match: {}", best_match_json);
+
+    let user_prompt = format!("{}\n\n {}", best_match_json, request.prompt);
     match ollama
         .send_chat_messages_with_history(
-            ChatMessageRequest::new(request.model, vec![ChatMessage::user(request.prompt)]),
+            ChatMessageRequest::new(request.model, vec![ChatMessage::user(user_prompt)]),
             request.chat_id,
         )
         .await
@@ -503,8 +557,11 @@ async fn fetch_preferences(
                     format!("Failed to read response body: {}", e)
                 })?;
 
-                println!("[fetch_preferences] Successfully received encrypted response.");
+                println!("[fetch_preferences] Successfully received encrypted response: {}", response_body);
 
+		// NOTE: REMOVE THIS LINE - DOING THIS FOR TESTING BECAUSE DECRYPTION NOT WORKING RN
+		return Err("Purposely skipping to Err due to failing decryption".to_string());
+		
                 let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| {
                     println!("[fetch_preferences] Failed to parse JSON: {}", e);
                     format!("Failed to parse JSON: {}", e)

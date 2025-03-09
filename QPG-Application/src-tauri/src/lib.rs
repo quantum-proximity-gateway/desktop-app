@@ -287,8 +287,10 @@ The "current" field is the current value on the computer, while the "lower_bound
 "upper_bound", and "default" fields represent the ranges/values in gsettings.
 Use this reference to inform your responses if needed. The prompt will always begin
 with a snippet of the reference JSON that is the most likely command the user is
-referring to, but this may not always be accurate. Remember, always reply with just
-the final JSON object, like:
+referring to, but this may not always be accurate. You will need to add a value
+to the end of the command based on the current and default fields in the JSON.
+Refer to the user's prompt to decide how to choose this value. Remember, always
+reply with just the final JSON object, like:
 
 {{
   "message": "...",

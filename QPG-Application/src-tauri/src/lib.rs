@@ -1,20 +1,21 @@
 use ollama_rs::generation::chat::MessageRole;
-use tauri::async_runtime::block_on;
-use url::Url;
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
 use ollama_rs::Ollama;
+use tauri::async_runtime::block_on;
+use tauri::State;
+use tauri_plugin_shell::ShellExt;
+use url::Url;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_json::Value;
 use std::collections::HashMap;
-use tauri::State;
+use std::collections::HashSet;
 use tokio::sync::Mutex as TokioMutex;
-use tauri_plugin_shell::ShellExt;
 use reqwest::Client;
 mod encryption;
 use encryption::{DecryptData, EncryptionClient};
 use strsim::jaro_winkler;
-
+use rust_stemmers::{Algorithm, Stemmer};
 
 const OLLAMA_BASE_URL: &str = "http://localhost:11434";
 const SERVER_URL: &str = "https://460f-5-151-28-149.ngrok-free.app";
@@ -134,29 +135,69 @@ fn get_platform_info() -> String {
 }
 
 #[tauri::command]
+fn preprocess_text(text: &str) -> HashSet<String> {
+    let stopwords: HashSet<&str> = [
+        "the", "is", "to", "a", "and", "for", "on", "in", "of", "with", "set", "enable", "disable"
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
+    let stemmer = Stemmer::create(Algorithm::English);
+
+    text.to_lowercase()
+        .split_whitespace()
+        .filter(|word| !stopwords.contains(*word))
+        .map(|word| stemmer.stem(word).to_string())
+        .collect()
+}
+
+#[tauri::command]
+fn cosine_similarity(set1: &HashSet<String>, set2: &HashSet<String>) -> f64 {
+    let intersection = set1.intersection(set2).count() as f64;
+    let norm1 = set1.len() as f64;
+    let norm2 = set2.len() as f64;
+
+    if norm1 == 0.0 || norm2 == 0.0 {
+        return 0.0;
+    }
+
+    intersection / (norm1.sqrt() * norm2.sqrt())
+}
+
+#[tauri::command]
 fn find_best_match(prompt: &str, json_str: &str) -> Option<String> {
     let parsed_json: Value = serde_json::from_str(json_str).ok()?;
     let mut best_match = None;
     let mut highest_score = 0.0;
 
-    if let Value::Object(settings) = parsed_json {
+    let prompt_tokens = preprocess_text(prompt);
 
+    if let Value::Object(settings) = parsed_json {
         for (key, value) in settings.iter() {
+
             if let Value::Object(commands) = value.get("commands")? {
                 if !commands.is_empty() {
-		    
-                    let similarity = jaro_winkler(prompt, key);
-                    println!("Similarity of '{}' w/ '{}' => {}", prompt, key, similarity);
+                    let key_tokens = preprocess_text(key);
 
-                    if similarity > highest_score {
-                        highest_score = similarity;
+                    let cosine_sim = cosine_similarity(&prompt_tokens, &key_tokens);
+                    let jw_sim = jaro_winkler(prompt, key);
+
+                    let weighted_similarity = (0.75 * cosine_sim) + (0.25 * jw_sim);
+
+                    println!(
+                        "Similarity of '{}' w/ '{}': Cosine: {:.3}, Jaro-Winkler: {:.3}, Combined: {:.3}",
+                        prompt, key, cosine_sim, jw_sim, weighted_similarity
+                    );
+
+                    if weighted_similarity > highest_score {
+                        highest_score = weighted_similarity;
                         best_match = Some(key.clone());
                     }
-		    
                 }
             }
+	    
         }
-	
     }
 
     best_match

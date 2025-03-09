@@ -11,6 +11,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use tokio::sync::Mutex as TokioMutex;
+use tokio::sync::OnceCell;
 use reqwest::Client;
 mod encryption;
 use encryption::{DecryptData, EncryptionClient};
@@ -110,7 +111,7 @@ fn get_linux_gui() -> Option<String> {
 }
 
 #[tauri::command]
-fn get_platform_info() -> String {
+async fn get_platform_info() -> String {
     #[cfg(target_os = "macos")] {
 	return "macos".into();
     }
@@ -238,40 +239,59 @@ fn filter_json_by_env(json_str: &str, env: &str) -> Result<String, serde_json::E
     serde_json::to_string_pretty(&data)
 }
 
+#[derive(Default)]
+pub struct GenerateState {
+    username: OnceCell<String>,
+    platform_info: OnceCell<String>,
+    json_example: OnceCell<String>,
+}
+
+impl GenerateState {
+    pub async fn get_username(&self, app_handle: &tauri::AppHandle) -> String {
+	self.username.get_or_init(|| async {
+	    get_username(app_handle.clone()).await.unwrap_or_else(|_| "unknown_user".to_string())
+	}).await.clone()
+    }
+
+    pub async fn get_platform_info(&self) -> String {
+	self.platform_info.get_or_init(|| async {
+	    get_platform_info().await
+	}).await.clone()
+    }
+
+    pub(crate) async fn get_json_example(&self, username: &str, encryption_instance: State<'_, EncryptionClientInstance>, platform_info: &str) -> String {
+        self.json_example.get_or_init(|| async {
+            fetch_preferences(username, encryption_instance.clone(), platform_info).await.unwrap_or_else(|_| "{}".to_string())
+        }).await.clone()
+    }
+}
+
 #[tauri::command]
 async fn generate(
     request: ChatRequest,
     encryption_instance: State<'_, EncryptionClientInstance>,
     g_ollama: State<'_, OllamaInstance>,
     seen_chats: State<'_, ChatIDs>,
-    app_handle: tauri::AppHandle
+    app_handle: tauri::AppHandle,
+    state: State<'_, GenerateState>
 ) -> Result<GenerateResult, String> {
+    let username = state.get_username(&app_handle).await;
+    println!("Username: {}", username);
 
-    println!("Generating response for {:?}", request);
-
-    // Fetch username using whomai to fetch user's preferences
-    let username = match get_username(app_handle.clone()).await {
-        Ok(username) => username,
-        Err(e) => {
-            println!("Warning: failed to get username from whoami: {}", e);
-	    return Err(format!("Failed to fetch username."));
-        }
-    };
-
-    println!("past username {:?}", username);
-
-    let platform_info = get_platform_info();
+    let platform_info = state.get_platform_info().await;
     println!("Platform: {}", platform_info);
+
+    let json_example = state.get_json_example(&username, encryption_instance.clone(), &platform_info).await;
+    println!("Filtered JSON: {}", json_example);
     
-    // Some issue here maybe reuse fetch_username
-    let json_example = match fetch_preferences(&username, encryption_instance.clone(), &platform_info).await {
-	Ok(filtered) => filtered,
-	Err(e) => return Err(format!("Failed to fetch preferences: {}", e)),
-    };
-    println!("Filtered JSON for {}: {}", platform_info, json_example);
+    let mut ollama = g_ollama.0.lock().await;
+    let mut seen_chats = seen_chats.0.lock().await;
     
-    let sys_prompt = format!(
-	r#""You're an assistant that only replies in JSON format with keys "message" and "command".
+    if !seen_chats.contains_key(&request.chat_id) {
+        seen_chats.insert(request.chat_id.clone(), true);
+
+	let sys_prompt = format!(
+		r#""You're an assistant that only replies in JSON format with keys "message" and "command".
 It is very important that you stick to the following JSON format.
 
 Your main job is to act as a computer accessibility coach that will reply to queries with a JSON
@@ -296,12 +316,8 @@ reply with just the final JSON object, like:
   "message": "...",
   "command": "..."
 }}"#, platform_info, json_example);
-    
-    let mut ollama = g_ollama.0.lock().await;
-    let mut seen_chats = seen_chats.0.lock().await;
-    
-    if !seen_chats.contains_key(&request.chat_id) {
-        seen_chats.insert(request.chat_id.clone(), true);
+	println!("System Prompt Initialized");
+	
         if let Err(e) = ollama.send_chat_messages_with_history(
             ChatMessageRequest::new(request.model.clone(), vec![ChatMessage::system(sys_prompt)]),
             request.chat_id.clone()).await {
@@ -692,6 +708,7 @@ pub fn run() {
             )
         )))
         .manage(ChatIDs(TokioMutex::new(HashMap::new())))
+	.manage(GenerateState::default())
         .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences, execute_command, get_username])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

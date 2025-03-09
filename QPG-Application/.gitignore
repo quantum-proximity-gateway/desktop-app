@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+/llamacpp-rust-example/target
+/llama-cpp-rs
+/src-tauri/models

@@ -312,12 +312,10 @@ Below is a reference JSON that shows possible accessibility commands for the cur
 
 {}
 
-The "current" field is the current value on the computer, while the "lower_bound",
-"upper_bound", and "default" fields represent the ranges/values in gsettings.
 Use this reference to inform your responses if needed. The prompt will always begin
 with a snippet of the reference JSON that is the most likely command the user is
 referring to, but this may not always be accurate. You will need to add a value
-to the end of the command based on the current and default fields in the JSON.
+to the end of the command based on the "current" and "default" fields in the JSON.
 Refer to the user's prompt to decide how to choose this value. Remember, always
 reply with just the final JSON object, like:
 
@@ -524,6 +522,7 @@ async fn gather_valid_commands_for_env(
 #[tauri::command]
 async fn execute_command(
     command: String,
+    update: bool,
     app_handle: tauri::AppHandle,
     encryption_instance: State<'_, EncryptionClientInstance>,
     state: State<'_, GenerateState>,
@@ -563,14 +562,16 @@ async fn execute_command(
 		let base_command_str = base_parts.join(" ");
 		let new_value_str = last_value.to_string();
 
-                update_json_current_value(
-                    &username,
-                    &base_command_str,
-                    &new_value_str,
-                    encryption_instance.clone(),
-		    state,
-                )
-                    .await?;
+		if update {
+		    update_json_current_value(
+			&username,
+			&base_command_str,
+			&new_value_str,
+			encryption_instance.clone(),
+			state,
+                    )
+			.await?;
+		}
             } else {
                 println!("Exit with code: {}", output.status.code().unwrap_or_default());
             }
@@ -774,7 +775,7 @@ async fn init_startup_commands(
 
 		let full_command = format!("{} {}", command_str.trim(), value_str);
 		println!("[startup_init] Executing: {}", full_command);
-		if let Err(e) = execute_command(full_command, app_handle.clone(), encryption_instance.clone(), state.clone()).await {
+		if let Err(e) = execute_command(full_command, false, app_handle.clone(), encryption_instance.clone(), state.clone()).await {
 		    println!("Warning: failed to run startup command. Error: {}", e);
 		}
 	    }

@@ -186,7 +186,7 @@ function App() {
                 <Button colorScheme="blue" onClick={async () => {
                   if (pendingCommand) {
                     try {
-                      await invoke("execute_command", { command: pendingCommand });
+			await invoke("execute_command", { command: pendingCommand, update: true });
                     } catch (error) {
                       alert(`Error: ${error}`);
                     }

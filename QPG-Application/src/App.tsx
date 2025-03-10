@@ -65,7 +65,7 @@ function App() {
   type Settings = {
     lower_bound?: number;
     upper_bound?: number;
-    default: DefaultValue;
+    current: DefaultValue;
     commands: Commands;
   };
 
@@ -186,7 +186,7 @@ function App() {
                 <Button colorScheme="blue" onClick={async () => {
                   if (pendingCommand) {
                     try {
-                      await invoke("execute_command", { command: pendingCommand });
+			await invoke("execute_command", { command: pendingCommand, update: true });
                     } catch (error) {
                       alert(`Error: ${error}`);
                     }
@@ -220,7 +220,7 @@ function App() {
                     {Object.entries(preferences).map(([key, settings], index) => (
                       <Box key={index} borderWidth="1px" borderRadius="md" p={4} width="100%">
                         <Text fontWeight="bold" mb={1}>{key}</Text>
-                        <Text>Default: {settings.default.toString()}</Text>
+                        <Text>Default: {settings.current.toString()}</Text>
                         {settings.lower_bound !== undefined && (
                           <Text>Lower Bound: {settings.lower_bound}</Text>
                         )}

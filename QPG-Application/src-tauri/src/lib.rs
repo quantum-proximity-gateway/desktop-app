@@ -227,6 +227,7 @@ pub struct GenerateState {
     platform_info: OnceCell<String>,
     full_json_example: RwLock<String>,
     filtered_json_example: RwLock<String>,
+    best_match_json_example: RwLock<String>,
 }
 
 impl Default for GenerateState {
@@ -236,6 +237,7 @@ impl Default for GenerateState {
 	    platform_info: OnceCell::new(),
 	    full_json_example: RwLock::new(String::new()),
 	    filtered_json_example: RwLock::new(String::new()),
+	    best_match_json_example: RwLock::new(String::new()),
 	}
     }
 }
@@ -259,6 +261,15 @@ impl GenerateState {
 
     pub async fn get_filtered_json(&self) -> String {
 	self.filtered_json_example.read().await.clone()
+    }
+
+    pub async fn get_best_match_json(&self) -> String {
+	self.best_match_json_example.read().await.clone()
+    }
+
+    pub async fn set_best_match_json(&self, value: &str) {
+	let mut writer = self.best_match_json_example.write().await;
+	*writer = value.to_string();
     }
 
     pub async fn update_jsons(&self, new_full: &str, new_filtered: &str) {
@@ -335,8 +346,8 @@ reply with just the final JSON object, like:
     let best_match = find_best_match(&request.prompt, &filtered_json);
     println!("Best match for prompt '{}': {:?}", request.prompt, best_match);
 
-    let best_match_json = match best_match.as_ref() {
-        Some(key) => {
+    let best_match_json = match best_match {
+        Some(ref key) => {
             let parsed_json: Value = serde_json::from_str(&filtered_json).unwrap_or(Value::Null);
 
 	    if let Value::Object(mut root) = parsed_json {
@@ -344,8 +355,12 @@ reply with just the final JSON object, like:
 		    let mut new_obj = serde_json::Map::new();
 		    new_obj.insert(key.clone(), matching_value);
 
-		    serde_json::to_string_pretty(&Value::Object(new_obj))
-			.unwrap_or_else(|_| filtered_json.clone())
+		    let snippet = serde_json::to_string_pretty(&Value::Object(new_obj))
+			.unwrap_or_else(|_| filtered_json.clone());
+
+		    state.set_best_match_json(&snippet).await;
+
+		    snippet
 		} else {
 		    filtered_json.clone()
 		}
@@ -353,9 +368,16 @@ reply with just the final JSON object, like:
 		filtered_json.clone()
 	    }
         }
-        None => filtered_json.clone(),
+        None => {
+	    let old_snippet = state.get_best_match_json().await;
+	    if !old_snippet.is_empty() {
+		old_snippet
+	    } else {
+		filtered_json.clone()
+	    }
+	}
     };
-    println!("[generate] Filtered JSON for best match: {}", best_match_json);
+    println!("[generate] Filtered JSON snippet: {}", best_match_json);
 
     let user_prompt = format!("{}\n\n {}", best_match_json, request.prompt);
 

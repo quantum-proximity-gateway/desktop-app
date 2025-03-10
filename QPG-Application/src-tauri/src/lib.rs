@@ -1,23 +1,21 @@
+use ollama_rs::Ollama;
 use ollama_rs::generation::chat::MessageRole;
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
-use ollama_rs::Ollama;
-use tauri::async_runtime::block_on;
 use tauri::State;
+use tauri::async_runtime::block_on;
 use tauri_plugin_shell::ShellExt;
 use url::Url;
 use serde::{Deserialize, Serialize};
-use serde_json;
-use serde_json::Value;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use tokio::sync::Mutex as TokioMutex;
-use tokio::sync::OnceCell;
+use serde_json::{self, Value};
+use std::fs;
+use std::collections::{HashMap, HashSet};
+use tokio::sync::{Mutex as TokioMutex, RwLock, OnceCell};
 use reqwest::Client;
 mod encryption;
 use encryption::{DecryptData, EncryptionClient};
 use rust_stemmers::{Algorithm, Stemmer};
 
-const OLLAMA_BASE_URL: &str = "https://6ad3-31-205-125-238.ngrok-free.app";
+const OLLAMA_BASE_URL: &str = "http://localhost:11434";
 const SERVER_URL: &str = "https://11f6-5-151-28-149.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
@@ -65,12 +63,6 @@ struct ModelResponse {
     // This is the response the model is trained to give
     message: String,
     command: String,
-}
-
-fn parse_model_response(json_str: String) -> Result<ModelResponse, serde_json::Error> {
-    // Sometimes the model might not respond in the right format, we need to think of a way to handle that.
-    let parsed_response: ModelResponse = serde_json::from_str(&json_str)?;
-    Ok(parsed_response)
 }
 
 #[derive(Serialize)]
@@ -168,34 +160,28 @@ fn cosine_similarity(set1: &HashSet<String>, set2: &HashSet<String>) -> f64 {
 #[tauri::command]
 fn find_best_match(prompt: &str, json_str: &str) -> Option<String> {
     let parsed_json: Value = serde_json::from_str(json_str).ok()?;
-    let mut best_match = None;
-    let mut highest_score = 0.0;
+    let map = parsed_json.as_object()?;
 
     let prompt_tokens = preprocess_text(prompt);
 
-    if let Value::Object(settings) = parsed_json {
-        for (key, value) in settings.iter() {
+    let mut best_match: Option<String> = None;
+    let mut highest_score = 0.0;
 
-            if let Value::Object(commands) = value.get("commands")? {
-                if !commands.is_empty() {
+    for (key, setting_val) in map {
+        if let Value::Object(obj) = setting_val {
+            if let Some(Value::Object(commands_obj)) = obj.get("commands") {
+                if !commands_obj.is_empty() {
                     let key_tokens = preprocess_text(key);
-                    let cosine_sim = cosine_similarity(&prompt_tokens, &key_tokens);
-
-                    println!(
-                        "Similarity of '{}' w/ '{}': {:.3}",
-                        prompt, key, cosine_sim
-                    );
-
-                    if cosine_sim > highest_score {
-                        highest_score = cosine_sim;
+                    let score = cosine_similarity(&prompt_tokens, &key_tokens);
+                    if score > highest_score {
+                        highest_score = score;
                         best_match = Some(key.clone());
                     }
                 }
             }
-	    
         }
     }
-
+    
     best_match
 }
 
@@ -218,9 +204,9 @@ fn filter_json_by_env(json_str: &str, env: &str) -> Result<String, serde_json::E
     let mut data: Value = serde_json::from_str(json_str)?;
 
     if let Value::Object(ref mut categories) = data {
-	for (_, value) in categories.iter_mut() {
-	    if let Value::Object(ref mut settings) = value {
-		if let Some(Value::Object(commands)) = settings.get_mut("commands") {
+	for (_, setting_value) in categories.iter_mut() {
+	    if let Value::Object(ref mut setting_obj) = setting_value {
+		if let Some(Value::Object(commands)) = setting_obj.get_mut("commands") {
 		    *commands = commands
 			.iter()
 			.filter(|(key, _)| key.as_str() == env)
@@ -229,16 +215,28 @@ fn filter_json_by_env(json_str: &str, env: &str) -> Result<String, serde_json::E
 		}
 	    }
 	}
+	
     }
 
     serde_json::to_string_pretty(&data)
 }
 
-#[derive(Default)]
 pub struct GenerateState {
     username: OnceCell<String>,
     platform_info: OnceCell<String>,
-    json_example: OnceCell<String>,
+    full_json_example: RwLock<String>,
+    filtered_json_example: RwLock<String>,
+}
+
+impl Default for GenerateState {
+    fn default() -> Self {
+	Self {
+	    username: OnceCell::new(),
+	    platform_info: OnceCell::new(),
+	    full_json_example: RwLock::new(String::new()),
+	    filtered_json_example: RwLock::new(String::new()),
+	}
+    }
 }
 
 impl GenerateState {
@@ -254,10 +252,23 @@ impl GenerateState {
 	}).await.clone()
     }
 
-    pub(crate) async fn get_json_example(&self, username: &str, encryption_instance: State<'_, EncryptionClientInstance>, platform_info: &str) -> String {
-        self.json_example.get_or_init(|| async {
-            fetch_preferences(username, encryption_instance.clone(), platform_info).await.unwrap_or_else(|_| "{}".to_string())
-        }).await.clone()
+    pub async fn get_full_json(&self) -> String {
+	self.full_json_example.read().await.clone()
+    }
+
+    pub async fn get_filtered_json(&self) -> String {
+	self.filtered_json_example.read().await.clone()
+    }
+
+    pub async fn update_jsons(&self, new_full: &str, new_filtered: &str) {
+	{
+	    let mut w_full = self.full_json_example.write().await;
+	    *w_full = new_full.to_string();
+	}
+	{
+	    let mut w_filtered = self.filtered_json_example.write().await;
+	    *w_filtered = new_filtered.to_string();
+	}
     }
 }
 
@@ -276,8 +287,14 @@ async fn generate(
     let platform_info = state.get_platform_info().await;
     println!("Platform: {}", platform_info);
 
-    let json_example = state.get_json_example(&username, encryption_instance.clone(), &platform_info).await;
-    println!("Filtered JSON: {}", json_example);
+    if state.get_full_json().await.is_empty() {
+	println!("Full JSON is empty. Automatically fetching preferences...");
+	if let Err(err) = fetch_preferences(&username, encryption_instance, &platform_info, state.clone()).await {
+	    return Err(format!("Failed to automatically fetch preferences: {}", err));
+	}
+    }
+    let filtered_json = state.get_filtered_json().await;
+    println!("Filtered JSON: {}", filtered_json);
     
     let mut ollama = g_ollama.0.lock().await;
     let mut seen_chats = seen_chats.0.lock().await;
@@ -310,7 +327,7 @@ reply with just the final JSON object, like:
 {{
   "message": "...",
   "command": "..."
-}}"#, platform_info, json_example);
+}}"#, platform_info, filtered_json);
 	println!("System Prompt Initialized");
 	
         if let Err(e) = ollama.send_chat_messages_with_history(
@@ -320,29 +337,33 @@ reply with just the final JSON object, like:
         }
     }
 
-    let best_match = find_best_match(&request.prompt, &json_example);
+    let best_match = find_best_match(&request.prompt, &filtered_json);
     println!("Best match for prompt '{}': {:?}", request.prompt, best_match);
 
     let best_match_json = match best_match.as_ref() {
         Some(key) => {
-            let parsed_json: Value = serde_json::from_str(&json_example).unwrap_or(Value::Null);
-            if let Value::Object(mut settings) = parsed_json {
-                if let Some(matching_value) = settings.remove(key) {
-                    let mut new_obj = serde_json::Map::new();
-                    new_obj.insert(key.clone(), matching_value);
-                    serde_json::to_string_pretty(&Value::Object(new_obj)).unwrap_or_else(|_| json_example.clone())
-                } else {
-                    json_example.clone()
-                }
-            } else {
-                json_example.clone()
-            }
+            let parsed_json: Value = serde_json::from_str(&filtered_json).unwrap_or(Value::Null);
+
+	    if let Value::Object(mut root) = parsed_json {
+		if let Some(matching_value) = root.remove(key) {
+		    let mut new_obj = serde_json::Map::new();
+		    new_obj.insert(key.clone(), matching_value);
+
+		    serde_json::to_string_pretty(&Value::Object(new_obj))
+			.unwrap_or_else(|_| filtered_json.clone())
+		} else {
+		    filtered_json.clone()
+		}
+	    } else {
+		filtered_json.clone()
+	    }
         }
-        None => json_example.clone(),
+        None => filtered_json.clone(),
     };
     println!("Filtered JSON for best match: {}", best_match_json);
 
     let user_prompt = format!("{}\n\n {}", best_match_json, request.prompt);
+
     match ollama
         .send_chat_messages_with_history(
             ChatMessageRequest::new(request.model, vec![ChatMessage::user(user_prompt)]),
@@ -352,21 +373,22 @@ reply with just the final JSON object, like:
     {
         Ok(mut res) => {
             println!("Received initial response: {:?}", res);
-	    let response = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
-            match parse_model_response(response) {
-                Ok(parsed_response) => {
-                    res.message = Some(ChatMessage::new(
+	    let response_str = res.message.as_ref().map(|m| m.content.clone()).unwrap_or_default();
+
+	    match serde_json::from_str::<ModelResponse>(&response_str) {
+		Ok(parsed_response) => {
+		    res.message = Some(ChatMessage::new(
 			MessageRole::Assistant,
-			parsed_response.message,
+			parsed_response.message.clone(),
 		    ));
 
 		    Ok(GenerateResult {
 			ollama_response: res,
 			command: Some(parsed_response.command),
 		    })
-                }
-                Err(e) => Err(format!("Failed to parse model response: {}", e)),
-            }
+		}
+		Err(e) => Err(format!("Failed to parse model response: {}", e)),
+	    }
         }
         Err(e) => Err(format!("Failed to generate text: {}", e)),
     }
@@ -377,34 +399,24 @@ async fn update_json_current_value(
     base_command: &str,
     new_value_str: &str,
     encryption_instance: State<'_, EncryptionClientInstance>,
+    state: State<'_, GenerateState>
 ) -> Result<(), String> {
-   
     let encryption_client = encryption_instance.0.lock().await;
     let client = Client::new();
-    let mut url = Url::parse(&format!("{}/preferences/{}", SERVER_URL, username)).unwrap();
-    url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
-    let response = client
-	.get(url)
-	.send()
-	.await
-	.map_err(|e| format!("Failed to fetch preferences: {}", e))?;
 
-    let prefs_resp = response
-        .json::<PreferencesAPIResponse>()
-        .await
-        .map_err(|e| format!("Failed to parse preferences JSON: {}", e))?;
+    let current_full_json = state.get_full_json().await;
+    println!("DEBUG: current_full_json = {}", current_full_json);
 
-    let mut config: AppConfig = serde_json::from_value(prefs_resp.preferences)
+    let mut config: AppConfig = serde_json::from_str(&current_full_json)
         .map_err(|e| format!("Could not parse preferences into AppConfig: {}", e))?;
 
     let mut found_match = false;
-    for (key, setting) in config.iter_mut() {
+    for (_key, setting) in config.iter_mut() {
         if setting.commands.gnome.trim() == base_command.trim() {
             let new_val: DefaultValue = parse_new_value(new_value_str, &setting.default);
             setting.current = Some(new_val);
-
             found_match = true;
-            println!("Updated '{}': current is now '{}'", key, new_value_str);
+            println!("Updated command '{}': current is now '{}'", base_command, new_value_str);
             break;
         }
     }
@@ -414,6 +426,10 @@ async fn update_json_current_value(
         return Ok(());
     }
 
+    let updated_full_json = serde_json::to_string_pretty(&config)
+	.map_err(|e| format!("Failed to serialize updated JSON: {}", e))?;
+    println!("Updated full json: {}", updated_full_json);
+
     let update_payload = UpdateJSONPreferencesRequest {
         username: username.to_string(),
         preferences: config,
@@ -421,6 +437,8 @@ async fn update_json_current_value(
 
     let json_payload = serde_json::to_string(&update_payload)
         .map_err(|e| format!("Failed to serialize payload: {}", e))?;
+    println!("json payload: {}", json_payload);
+
     let encrypted_payload = encryption_client.encrypt_data(&json_payload);
  
     let post_url = format!("{}/preferences/update", SERVER_URL);
@@ -439,6 +457,13 @@ async fn update_json_current_value(
     }
 
     println!("Successfully updated preferences on the server.");
+
+    let platform_info = state.get_platform_info().await;
+    let newly_filtered = filter_json_by_env(&updated_full_json, &platform_info)
+	.map_err(|e| format!("Failed to filter updated JSON: {}", e))?;
+
+    state.update_jsons(&updated_full_json, &newly_filtered).await;
+    
     Ok(())
 }
 
@@ -466,9 +491,9 @@ fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultVa
 async fn execute_command(
     command: String,
     app_handle: tauri::AppHandle,
-    encryption_instance: State<'_, EncryptionClientInstance>
+    encryption_instance: State<'_, EncryptionClientInstance>,
+    state: State<'_, GenerateState>,
 ) -> Result<(), String> {
-    // execute shell command https://v2.tauri.app/plugin/shell/
     let shell = app_handle.shell();
     
     let username = match get_username(app_handle.clone()).await {
@@ -486,7 +511,7 @@ async fn execute_command(
     match shell.command(cmd).args(args).output().await { // so unsafe we need to whitelist only gsettings
             Ok(output) => {
                 if output.status.success() {
-            let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+		    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
                     println!("Command result: {:?}", stdout_str);
 
                     if !args.is_empty() {
@@ -500,7 +525,8 @@ async fn execute_command(
                             &username,
                             &base_command_str,
                             &new_value_str,
-                            encryption_instance.clone()
+                            encryption_instance.clone(),
+			    state,
                         )
                         .await?;
                     }
@@ -526,8 +552,7 @@ async fn execute_command(
             }
         }
     }
-    
-    // we will need to save new command settings here
+
     println!("Command executed: {}", command);
 
     Ok(())
@@ -568,10 +593,8 @@ async fn fetch_preferences(
     username: &str,
     encryption_instance: State<'_, EncryptionClientInstance>,
     env: &str,
+    state: State<'_, GenerateState>,
 ) -> Result<String, String> {
-    use std::fs;
-    use serde_json;
-
     println!("[fetch_preferences] Fetching preferences for user: {}", username);
     println!("[fetch_preferences] Platform environment: {}", env);
 
@@ -583,7 +606,6 @@ async fn fetch_preferences(
         let config: AppConfig = serde_json::from_str(&file_contents)?;
         Ok(config)
     }
-
     let default_commands = match load_default_app_config("src/json_example.json") {
         Ok(config) => {
             println!("[fetch_preferences] Successfully loaded default JSON.");
@@ -634,20 +656,47 @@ async fn fetch_preferences(
         }
     };
 
-    println!("[fetch_preferences] Filtering JSON for environment: {}", env);
-    match filter_json_by_env(&preferences_json, env) {
-        Ok(filtered_json) => {
-            println!("[fetch_preferences] Successfully filtered JSON.");
-            Ok(filtered_json)
+    let flattened = match serde_json::from_str::<Value>(&preferences_json) {
+        Ok(mut val) => {
+            if let Value::Object(ref mut root_obj) = val {
+                if let Some(Value::Object(inner_prefs)) = root_obj.remove("preferences") {
+                    match serde_json::to_string_pretty(&Value::Object(inner_prefs)) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            println!("Failed flattening 'preferences': {}", e);
+                            preferences_json.clone()
+                        }
+                    }
+                } else {
+                    preferences_json.clone()
+                }
+            } else {
+                preferences_json.clone()
+            }
         }
         Err(e) => {
-            println!("[fetch_preferences] Failed to filter JSON: {}", e);
-            Err(format!("Failed to filter JSON: {}", e))
+            println!("Failed to parse server JSON: {}", e);
+            preferences_json.clone()
         }
-    }
-}
+    };
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+    println!("[fetch_preferences] Filtering JSON for environment: {}", env);
+    let filtered_json_str = match filter_json_by_env(&flattened, env) {
+        Ok(fj) => {
+            println!("[fetch_preferences] Successfully filtered JSON.");
+            fj
+        }
+        Err(e) => {
+	    let msg = format!("Failed to filter JSON: {}", e);
+            println!("[fetch_preferences] {}", msg);
+            return Err(msg);
+        }
+    };
+
+    state.update_jsons(&flattened, &filtered_json_str).await;
+
+    Ok(filtered_json_str)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

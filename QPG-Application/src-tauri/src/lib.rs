@@ -18,8 +18,8 @@ use encryption::{DecryptData, EncryptionClient};
 use strsim::jaro_winkler;
 use rust_stemmers::{Algorithm, Stemmer};
 
-const OLLAMA_BASE_URL: &str = "http://localhost:11434";
-const SERVER_URL: &str = "https://460f-5-151-28-149.ngrok-free.app";
+const OLLAMA_BASE_URL: &str = "https://6ad3-31-205-125-238.ngrok-free.app";
+const SERVER_URL: &str = "https://11f6-5-151-28-149.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct EncryptionClientInstance(TokioMutex<EncryptionClient>);
@@ -618,9 +618,6 @@ async fn fetch_preferences(
 
                 println!("[fetch_preferences] Successfully received encrypted response: {}", response_body);
 
-		// NOTE: REMOVE THIS LINE - DOING THIS FOR TESTING BECAUSE DECRYPTION NOT WORKING RN
-		return Err("Purposely skipping to Err due to failing decryption".to_string());
-		
                 let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| {
                     println!("[fetch_preferences] Failed to parse JSON: {}", e);
                     format!("Failed to parse JSON: {}", e)

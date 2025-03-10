@@ -481,6 +481,46 @@ fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultVa
     }
 }
 
+async fn gather_valid_commands_for_env(
+    state: &GenerateState,
+    env: &str,
+) -> Result<HashSet<String>, String> {
+    let full_json = state.get_full_json().await;
+    if full_json.is_empty() {
+	return Ok(HashSet::new());
+    }
+
+    let parsed: Value = match serde_json::from_str(&full_json) {
+	Ok(val) => val,
+	Err(e) => {
+	    return Err(format!("Unable to parse full JSON in gather valid commands fn: {}", e));
+	}
+    };
+
+    let mut valid_commands = HashSet::new();
+
+    if let Value::Object(map) = parsed {
+	for (_, setting_value) in map.iter() {
+
+	    if let Ok(setting) = serde_json::from_value::<Setting>(setting_value.clone()) {
+		let env_cmd = match env {
+		    s if s.contains("gnome") => &setting.commands.gnome,
+		    "macos" => &setting.commands.macos,
+		    "windows" => &setting.commands.windows,
+		    _ => "",
+		};
+		let trimmed = env_cmd.trim();
+		if !trimmed.is_empty() {
+		    valid_commands.insert(trimmed.to_string());
+		}
+	    }
+	    
+	}
+    }
+
+    Ok(valid_commands)
+}
+
 #[tauri::command]
 async fn execute_command(
     command: String,
@@ -488,66 +528,58 @@ async fn execute_command(
     encryption_instance: State<'_, EncryptionClientInstance>,
     state: State<'_, GenerateState>,
 ) -> Result<(), String> {
-    let shell = app_handle.shell();
+    let command_parts: Vec<&str> = command.split_whitespace().collect();
+    if command_parts.len() < 2 {
+	return Err(format!("Invalid command format: must have base command + 1 argument"));
+    }
+
+    let (base_parts, value_part) = command_parts.split_at(command_parts.len() - 1);
+    let last_value = value_part.first().unwrap();
+    let base_cmd_str = base_parts.join(" ");
+
+    let platform_info = state.get_platform_info().await;
+    let valid_commands = gather_valid_commands_for_env(&state, &platform_info).await?;
+    if !valid_commands.contains(&base_cmd_str) {
+	return Err(format!("Unrecognised/unauthorised command base: '{}'. Will not execute command.", base_cmd_str));
+    }
+
+    println!("Attempting to run shell command: {}", command);
     
+    let shell = app_handle.shell();
     let username = match get_username(app_handle.clone()).await {
         Ok(username) => username,
         Err(e) => {
             println!("Warning: failed to get username from whoami: {}", e);
-        return Err(format!("Failed to fetch username."));
+            return Err(format!("Failed to fetch username."));
         }
     };
 
-    println!("Attempting to run shell command: {}", command);
+    match shell.command(&base_parts[0]).args(&base_parts[1..]).arg(last_value).output().await {
+        Ok(output) => {
+            if output.status.success() {
+		let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
+                println!("Command result: {:?}", stdout_str);
 
-    let command_parts: Vec<&str> = command.split_whitespace().collect();
-    if let Some((cmd, args)) = command_parts.split_first() {
-    match shell.command(cmd).args(args).output().await { // so unsafe we need to whitelist only gsettings
-            Ok(output) => {
-                if output.status.success() {
-		    let stdout_str = String::from_utf8(output.stdout).unwrap_or_else(|_| "".to_string());
-                    println!("Command result: {:?}", stdout_str);
+		let base_command_str = base_parts.join(" ");
+		let new_value_str = last_value.to_string();
 
-                    if !args.is_empty() {
-                        let new_value_str = args.last().unwrap().to_string();
-                        let base_command_str = {
-                            let without_last = &args[..args.len() - 1];
-                            format!("{} {}", cmd, without_last.join(" "))
-                        };
-
-                        update_json_current_value(
-                            &username,
-                            &base_command_str,
-                            &new_value_str,
-                            encryption_instance.clone(),
-			    state,
-                        )
-                        .await?;
-                    }
-                } else {
-                    println!("Exit with code: {}", output.status.code().unwrap());
-                }
-            }
-            Err(e) => {
-                println!("Failed to execute command: {} with error {}", command, e);
+                update_json_current_value(
+                    &username,
+                    &base_command_str,
+                    &new_value_str,
+                    encryption_instance.clone(),
+		    state,
+                )
+                    .await?;
+            } else {
+                println!("Exit with code: {}", output.status.code().unwrap_or_default());
             }
         }
-    } else {
-	match shell.command(command.clone()).output().await { // so unsafe we need to whitelist only gsettings
-            Ok(output) => {
-                if output.status.success() {
-                    println!("Command result: {:?}", String::from_utf8(output.stdout));
-                } else {
-                    println!("Exit with code: {}", output.status.code().unwrap());
-                }
-            }
-            Err(e) => {
-                println!("Failed to execute command: {} with error {}", command, e);
-            }
+        Err(e) => {
+            println!("Failed to execute command: {} with error {}", command, e);
         }
     }
-
-    println!("Command executed: {}", command);
+    println!("[execute_command] Command executed: {}", command);
 
     Ok(())
 }

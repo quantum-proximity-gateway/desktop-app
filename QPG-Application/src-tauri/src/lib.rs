@@ -323,12 +323,10 @@ Below is a reference JSON that shows possible accessibility commands for the cur
 
 {}
 
-Use this reference to inform your responses if needed. The prompt will always begin
-with a snippet of the reference JSON that is the most likely command the user is
-referring to, but this may not always be accurate. You will need to add a value
-to the end of the command based on the "current" field in the JSON. Refer to the
-user's prompt to decide how to choose this value. Remember, always reply with just
-the final JSON object, like:
+The prompt will always begin with a snippet of the reference JSON that is the most
+likely command the user is referring to. You will need to add a value to the end of the
+command found in the "command" field, and use "current" to help you figure out how to
+decide this new value. Remember, always reply with just the final JSON object, like:
 
 {{
   "message": "...",

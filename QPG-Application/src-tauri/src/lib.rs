@@ -16,8 +16,8 @@ mod encryption;
 use encryption::{DecryptData, EncryptionClient};
 use rust_stemmers::{Algorithm, Stemmer};
 
-const OLLAMA_BASE_URL: &str = "http://localhost:11434";
-const SERVER_URL: &str = "https://11f6-5-151-28-149.ngrok-free.app";
+const OLLAMA_BASE_URL: &str = "https://09cf-144-82-8-183.ngrok-free.app";
+const SERVER_URL: &str = "https://3ef1-31-205-125-238.ngrok-free.app";
 
 struct OllamaInstance(TokioMutex<Ollama>);
 struct EncryptionClientInstance(TokioMutex<EncryptionClient>);
@@ -438,7 +438,7 @@ async fn update_json_current_value(
     let post_url = format!("{}/preferences/update", SERVER_URL);
     let update_resp = client
         .post(&post_url)
-        .json(&encrypted_payload)
+        .json(&encrypted_payload?)
         .send()
         .await
         .map_err(|e| format!("Failed to send update to server: {}", e))?;

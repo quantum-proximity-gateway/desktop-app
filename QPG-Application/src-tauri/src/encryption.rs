@@ -39,7 +39,7 @@ pub struct EncryptionClient {
     pub client_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EncryptedData {
     pub ciphertext_b64: String,
     pub nonce_b64: String,

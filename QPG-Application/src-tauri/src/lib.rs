@@ -15,7 +15,6 @@ use tokio::sync::OnceCell;
 use reqwest::Client;
 mod encryption;
 use encryption::{DecryptData, EncryptionClient};
-use strsim::jaro_winkler;
 use rust_stemmers::{Algorithm, Stemmer};
 
 const OLLAMA_BASE_URL: &str = "https://6ad3-31-205-125-238.ngrok-free.app";
@@ -180,19 +179,15 @@ fn find_best_match(prompt: &str, json_str: &str) -> Option<String> {
             if let Value::Object(commands) = value.get("commands")? {
                 if !commands.is_empty() {
                     let key_tokens = preprocess_text(key);
-
                     let cosine_sim = cosine_similarity(&prompt_tokens, &key_tokens);
-                    let jw_sim = jaro_winkler(prompt, key);
-
-                    let weighted_similarity = (0.75 * cosine_sim) + (0.25 * jw_sim);
 
                     println!(
-                        "Similarity of '{}' w/ '{}': Cosine: {:.3}, Jaro-Winkler: {:.3}, Combined: {:.3}",
-                        prompt, key, cosine_sim, jw_sim, weighted_similarity
+                        "Similarity of '{}' w/ '{}': {:.3}",
+                        prompt, key, cosine_sim
                     );
 
-                    if weighted_similarity > highest_score {
-                        highest_score = weighted_similarity;
+                    if cosine_sim > highest_score {
+                        highest_score = cosine_sim;
                         best_match = Some(key.clone());
                     }
                 }

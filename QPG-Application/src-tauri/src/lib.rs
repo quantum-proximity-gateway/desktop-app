@@ -2,6 +2,7 @@ use ollama_rs::Ollama;
 use ollama_rs::generation::chat::MessageRole;
 use ollama_rs::generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse};
 use tauri::State;
+use tauri::Manager;
 use tauri::async_runtime::block_on;
 use tauri_plugin_shell::ShellExt;
 use url::Url;
@@ -282,19 +283,15 @@ async fn generate(
     state: State<'_, GenerateState>
 ) -> Result<GenerateResult, String> {
     let username = state.get_username(&app_handle).await;
-    println!("Username: {}", username);
-
     let platform_info = state.get_platform_info().await;
-    println!("Platform: {}", platform_info);
 
     if state.get_full_json().await.is_empty() {
-	println!("Full JSON is empty. Automatically fetching preferences...");
+	println!("[generate] Full JSON empty; fetching preferences from server...");
 	if let Err(err) = fetch_preferences(&username, encryption_instance, &platform_info, state.clone()).await {
 	    return Err(format!("Failed to automatically fetch preferences: {}", err));
 	}
     }
     let filtered_json = state.get_filtered_json().await;
-    println!("Filtered JSON: {}", filtered_json);
     
     let mut ollama = g_ollama.0.lock().await;
     let mut seen_chats = seen_chats.0.lock().await;
@@ -360,7 +357,7 @@ reply with just the final JSON object, like:
         }
         None => filtered_json.clone(),
     };
-    println!("Filtered JSON for best match: {}", best_match_json);
+    println!("[generate] Filtered JSON for best match: {}", best_match_json);
 
     let user_prompt = format!("{}\n\n {}", best_match_json, request.prompt);
 
@@ -405,7 +402,6 @@ async fn update_json_current_value(
     let client = Client::new();
 
     let current_full_json = state.get_full_json().await;
-    println!("DEBUG: current_full_json = {}", current_full_json);
 
     let mut config: AppConfig = serde_json::from_str(&current_full_json)
         .map_err(|e| format!("Could not parse preferences into AppConfig: {}", e))?;
@@ -428,7 +424,6 @@ async fn update_json_current_value(
 
     let updated_full_json = serde_json::to_string_pretty(&config)
 	.map_err(|e| format!("Failed to serialize updated JSON: {}", e))?;
-    println!("Updated full json: {}", updated_full_json);
 
     let update_payload = UpdateJSONPreferencesRequest {
         username: username.to_string(),
@@ -437,7 +432,6 @@ async fn update_json_current_value(
 
     let json_payload = serde_json::to_string(&update_payload)
         .map_err(|e| format!("Failed to serialize payload: {}", e))?;
-    println!("json payload: {}", json_payload);
 
     let encrypted_payload = encryption_client.encrypt_data(&json_payload);
  
@@ -559,10 +553,13 @@ async fn execute_command(
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 struct Commands {
+    #[serde(default)]
     windows: String,
+    #[serde(default)]
     macos: String,
+    #[serde(default)]
     gnome: String,
 }
 
@@ -583,6 +580,7 @@ pub struct Setting {
     default: DefaultValue,
     #[serde(default)]
     current: Option<DefaultValue>,
+    #[serde(default)]
     commands: Commands,
 }
 
@@ -632,8 +630,6 @@ async fn fetch_preferences(
                     println!("[fetch_preferences] Failed to read response body: {}", e);
                     format!("Failed to read response body: {}", e)
                 })?;
-
-                println!("[fetch_preferences] Successfully received encrypted response: {}", response_body);
 
                 let encrypted_body: DecryptData = serde_json::from_str(&response_body).map_err(|e| {
                     println!("[fetch_preferences] Failed to parse JSON: {}", e);
@@ -698,10 +694,86 @@ async fn fetch_preferences(
     Ok(filtered_json_str)
 }
 
+#[tauri::command]
+async fn init_startup_commands(
+    app_handle: tauri::AppHandle,
+    encryption_instance: State<'_, EncryptionClientInstance>,
+    state: State<'_, GenerateState>,
+) -> Result<(), String> {
+    let username = state.get_username(&app_handle).await;
+    let platform_info = state.get_platform_info().await;
+    println!("[startup_init] username = {}, platform_info = {}", username, platform_info);
+
+    if state.get_full_json().await.is_empty() {
+	println!("[startup_init] Full JSON empty; fetching preferences from server...");
+	fetch_preferences(&username, encryption_instance.clone(), &platform_info, state.clone())
+            .await
+            .map_err(|e| format!("Failed to fetch preferences during startup: {}", e))?;
+    }
+
+    let filtered_json = state.get_filtered_json().await;
+    let parsed: Value = serde_json::from_str(&filtered_json)
+	.map_err(|e| format!("Failed to parse filtered JSON: {}", e))?;
+
+    if let Value::Object(obj) = parsed {
+	for (_, setting_value) in obj.iter() {
+
+	    if let Ok(setting) = serde_json::from_value::<Setting>(setting_value.clone()) {
+		let command_str = match platform_info.as_str() {
+		    "windows" => setting.commands.windows.clone(),
+		    "macos" => setting.commands.macos.clone(),
+		    s if s.contains("gnome") => setting.commands.gnome.clone(),
+		    _ => "".to_string(),
+		};
+		if command_str.trim().is_empty() {
+		    continue;
+		}
+
+		let final_value = match &setting.current {
+		    Some(cv) => cv,
+		    None => &setting.default,
+		};
+
+		let value_str = match final_value {
+		    DefaultValue::Bool(b) => b.to_string(),
+		    DefaultValue::Float(f) => f.to_string(),
+		    DefaultValue::String(s) => s.to_string(),
+		};
+
+		let full_command = format!("{} {}", command_str.trim(), value_str);
+		println!("[startup_init] Executing: {}", full_command);
+		if let Err(e) = execute_command(full_command, app_handle.clone(), encryption_instance.clone(), state.clone()).await {
+		    println!("Warning: failed to run startup command. Error: {}", e);
+		}
+	    }
+
+	}
+    }
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(move |app| {
+	    let handle = app.app_handle(); 
+            
+            tauri::async_runtime::block_on(async move {
+                let encryption_instance = handle.state::<EncryptionClientInstance>();
+                let generate_state = handle.state::<GenerateState>();
+
+                if let Err(err) = init_startup_commands(
+                    handle.clone(),
+                    encryption_instance.clone(),
+                    generate_state.clone(),
+                )
+                .await
+                {
+                    eprintln!("Failed to run startup init: {}", err);
+                }
+            });
+	    
             #[cfg(desktop)]
             {
                 use tauri_plugin_autostart::MacosLauncher;
@@ -722,8 +794,7 @@ pub fn run() {
                 let _ = autostart_manager.disable();
             }
             Ok(())
-        })
-        
+        })        
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(EncryptionClientInstance(TokioMutex::new(
@@ -750,7 +821,7 @@ pub fn run() {
         )))
         .manage(ChatIDs(TokioMutex::new(HashMap::new())))
 	.manage(GenerateState::default())
-        .invoke_handler(tauri::generate_handler![list_models, generate, fetch_preferences, execute_command, get_username])
+        .invoke_handler(tauri::generate_handler![list_models, init_startup_commands, generate, fetch_preferences, execute_command, get_username])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

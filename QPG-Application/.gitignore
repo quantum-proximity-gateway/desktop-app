@@ -23,4 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-llama-cpp-rs/
+/llamacpp-rust-example/target
+/llama-cpp-rs
+/src-tauri/models

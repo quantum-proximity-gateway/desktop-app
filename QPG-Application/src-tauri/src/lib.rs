@@ -326,9 +326,9 @@ Below is a reference JSON that shows possible accessibility commands for the cur
 Use this reference to inform your responses if needed. The prompt will always begin
 with a snippet of the reference JSON that is the most likely command the user is
 referring to, but this may not always be accurate. You will need to add a value
-to the end of the command based on the "current" and "default" fields in the JSON.
-Refer to the user's prompt to decide how to choose this value. Remember, always
-reply with just the final JSON object, like:
+to the end of the command based on the "current" field in the JSON. Refer to the
+user's prompt to decide how to choose this value. Remember, always reply with just
+the final JSON object, like:
 
 {{
   "message": "...",
@@ -429,8 +429,8 @@ async fn update_json_current_value(
     let mut found_match = false;
     for (_key, setting) in config.iter_mut() {
         if setting.commands.gnome.trim() == base_command.trim() {
-            let new_val: DefaultValue = parse_new_value(new_value_str, &setting.default);
-            setting.current = Some(new_val);
+            let new_val: DefaultValue = parse_new_value(new_value_str, &setting.current);
+            setting.current = new_val;
             found_match = true;
             println!("Updated command '{}': current is now '{}'", base_command, new_value_str);
             break;
@@ -632,9 +632,7 @@ pub struct Setting {
     lower_bound: Option<f32>,
     #[serde(default)]
     upper_bound: Option<f32>,
-    default: DefaultValue,
-    #[serde(default)]
-    current: Option<DefaultValue>,
+    current: DefaultValue,
     #[serde(default)]
     commands: Commands,
 }
@@ -784,10 +782,7 @@ async fn init_startup_commands(
 		    continue;
 		}
 
-		let final_value = match &setting.current {
-		    Some(cv) => cv,
-		    None => &setting.default,
-		};
+		let final_value = &setting.current;
 
 		let value_str = match final_value {
 		    DefaultValue::Bool(b) => b.to_string(),

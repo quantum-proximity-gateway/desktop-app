@@ -1,5 +1,5 @@
-pub mod startup; // init_startup_commands
-pub mod generation; // generate-related commands
+pub mod startup;
+pub mod generation;
 
 pub use startup::init_startup_commands;
 
@@ -9,7 +9,6 @@ use crate::preferences;
 use crate::models::{ChatRequest, GenerateResult};
 use tauri_plugin_shell::ShellExt;
 
-/// Example command from original code
 #[tauri::command]
 pub async fn list_models() -> Result<Vec<String>, String> {
     use ollama_rs::Ollama;
@@ -40,7 +39,6 @@ pub async fn list_models() -> Result<Vec<String>, String> {
     Ok(models)
 }
 
-/// Example command from original code
 #[tauri::command]
 pub async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
     let shell = app_handle.shell();
@@ -56,7 +54,6 @@ pub async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String
     }
 }
 
-/// Another command, e.g. `fetch_preferences` 
 #[tauri::command]
 pub async fn fetch_preferences(
     username: &str,
@@ -67,7 +64,6 @@ pub async fn fetch_preferences(
     preferences::fetch_preferences_impl(&username, &encryption_instance, &env, &state).await
 }
 
-/// Another command to execute a shell command
 #[tauri::command]
 pub async fn execute_command(
     command: String,
@@ -85,7 +81,6 @@ pub async fn execute_command(
     ).await
 }
 
-/// The main generation command
 #[tauri::command]
 pub async fn generate(
     request: ChatRequest,

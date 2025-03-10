@@ -123,17 +123,6 @@ impl EncryptionClient {
             secret: secret.unprotected_as_bytes().to_vec()
         };
         Ok(result)
-        /*
-        let pk_bytes: Vec<u8> = BASE64_STANDARD.decode(data.public_key_b64).map_err(|e| format!("Failed to decode base64: {:?}", e))?;
-        let pk_bits = bitvec::vec::BitVec::from_vec(pk_bytes.clone());
-        let ek = MlKemEncapsulationKey::<{MlKem512::K}>::deserialize(&pk_bits);
-        let (key, ciphertext) = encaps::<MlKem512>(ek); // ML-KEM-512
-        let c_bytes = ciphertext.serialize();
-        let ciphertext_b64: String = BASE64_STANDARD.encode(c_bytes.into_vec());
-    
-        
-        Ok(result)
-        */
     }
 
     pub fn encrypt_data(&self, data: &str) -> Result<EncryptedData, String> {

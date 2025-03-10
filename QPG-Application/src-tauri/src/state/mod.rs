@@ -4,25 +4,15 @@ use tokio::sync::OnceCell;
 use crate::encryption::EncryptionClient;
 use ollama_rs::Ollama;
 
-// Holds the main Ollama instance
 pub struct OllamaInstance(pub Mutex<Ollama>);
-
-// Encryption client
 pub struct EncryptionClientInstance(pub Mutex<EncryptionClient>);
-
-// Keep track of seen chat IDs
 pub struct ChatIDs(pub Mutex<HashMap<String, bool>>);
 
-// The main state for generation
 pub struct GenerateState {
     username: OnceCell<String>,
     platform_info: OnceCell<String>,
-
-    // The full JSON from the server
     full_json_example: RwLock<String>,
-    // The filtered JSON for the current environment
     filtered_json_example: RwLock<String>,
-    // Snippet of the best match
     best_match_json_example: RwLock<String>,
 }
 
@@ -53,7 +43,7 @@ impl GenerateState {
     pub async fn get_platform_info(&self) -> String {
 	self.platform_info
             .get_or_init(|| async {
-		get_platform_info() // call the local function above
+		get_platform_info()
             })
             .await
             .clone()
@@ -88,7 +78,7 @@ impl GenerateState {
     }
 }
 
-#[tauri::command] // If you still want it as a Tauri command
+#[tauri::command]
 fn get_platform_info() -> String {
     #[cfg(target_os = "macos")]
     {

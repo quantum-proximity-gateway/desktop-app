@@ -15,12 +15,11 @@ pub async fn init_startup_commands(
     let platform_info = state.get_platform_info().await;
     println!("[startup_init] username = {}, platform_info = {}", username, platform_info);
 
-    // If we have no full JSON loaded, fetch from the server
     if state.get_full_json().await.is_empty() {
         println!("[startup_init] Full JSON empty; fetching preferences from server...");
         preferences::fetch_preferences_impl(
 	    &username,
-	    &encryption_instance, // pass a reference
+	    &encryption_instance,
 	    &platform_info,
 	    &state
 	).await?;
@@ -32,7 +31,6 @@ pub async fn init_startup_commands(
 
     if let Value::Object(obj) = parsed {
         for (_, setting_value) in obj.iter() {
-            // Each `setting_value` is a Setting
             if let Ok(setting) = serde_json::from_value::<Setting>(setting_value.clone()) {
                 let command_str = match platform_info.as_str() {
                     "windows" => setting.commands.windows.clone(),
@@ -53,8 +51,6 @@ pub async fn init_startup_commands(
                 let full_command = format!("{} {}", command_str.trim(), value_str);
                 println!("[startup_init] Executing: {}", full_command);
 
-                // We don't want to "update" the JSON each time we run a startup command,
-                // so we set `update` to false.
                 if let Err(e) = super::generation::execute_command_impl(
                     full_command,
                     false,

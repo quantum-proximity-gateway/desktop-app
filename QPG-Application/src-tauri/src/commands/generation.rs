@@ -7,7 +7,6 @@ use ollama_rs::generation::chat::request::ChatMessageRequest;
 use serde_json::{Value};
 use tauri_plugin_shell::ShellExt;
 
-/// The actual logic used by the `generate` command
 pub async fn generate_impl(
     request: ChatRequest,
     encryption_instance: State<'_, EncryptionClientInstance>,
@@ -19,11 +18,9 @@ pub async fn generate_impl(
     let username = state.get_username(&app_handle).await;
     let platform_info = state.get_platform_info().await;
 
-    // If no preferences yet, fetch them
     if state.get_full_json().await.is_empty() {
 	println!("[generate] Full JSON empty; fetching preferences from server...");
 	
-	// Just use `?` to bubble up the error if it occurs
 	crate::preferences::fetch_preferences_impl(
             &username,
             &encryption_instance,
@@ -31,7 +28,6 @@ pub async fn generate_impl(
             &state
 	)
 	    .await
-	// Convert any error to a different message if desired
 	    .map_err(|err| format!("Failed to automatically fetch preferences: {}", err))?;
     }
 
@@ -39,7 +35,6 @@ pub async fn generate_impl(
     let mut ollama = g_ollama.0.lock().await;
     let mut seen_chats = seen_chats.0.lock().await;
 
-    // Initialize system prompt for new chat session
     if !seen_chats.contains_key(&request.chat_id) {
         seen_chats.insert(request.chat_id.clone(), true);
 
@@ -85,11 +80,9 @@ out how to decide this new value. Remember, always reply with just the final JSO
         }
     }
 
-    // Find the best match for this prompt
     let best_match = crate::preferences::find_best_match(&request.prompt, &filtered_json);
     println!("Best match for prompt '{}': {:?}", request.prompt, best_match);
 
-    // Attempt to make a "snippet" that matches the user’s prompt
     let best_match_json = match best_match {
         Some(ref key) => {
             let parsed_json: Value = serde_json::from_str(&filtered_json).unwrap_or(Value::Null);
@@ -160,7 +153,6 @@ out how to decide this new value. Remember, always reply with just the final JSO
     }
 }
 
-/// The actual logic for executing a command
 pub async fn execute_command_impl(
     command: String,
     update: bool,
@@ -200,7 +192,6 @@ pub async fn execute_command_impl(
                 println!("Command result: {:?}", stdout_str);
 
                 if update {
-                    // Update the JSON's "current" value for the command we just ran
                     if let Err(err) = update_json_current_value(
                         &username,
                         &base_cmd_str,

@@ -9,7 +9,6 @@ use crate::encryption::DecryptData;
 pub const OLLAMA_BASE_URL: &str = "https://c61e-144-82-8-183.ngrok-free.app";
 pub const SERVER_URL: &str = "https://3ef1-31-205-125-238.ngrok-free.app";
 
-/// Implementation behind the `fetch_preferences` command
 pub async fn fetch_preferences_impl(
     username: &str,
     encryption_instance: &State<'_, EncryptionClientInstance>,
@@ -21,7 +20,6 @@ pub async fn fetch_preferences_impl(
 
     let encryption_client = encryption_instance.0.lock().await;
 
-    // Fallback: read local default config
     fn load_default_app_config(path: &str) -> Result<AppConfig, Box<dyn std::error::Error>> {
         let file_contents = fs::read_to_string(path)?;
         let config: AppConfig = serde_json::from_str(&file_contents)?;
@@ -116,7 +114,6 @@ pub async fn fetch_preferences_impl(
     Ok(filtered_json_str)
 }
 
-/// Filter the JSON so that only commands for a particular environment remain
 pub fn filter_json_by_env(json_str: &str, env: &str) -> Result<String, serde_json::Error> {
     let mut data: Value = serde_json::from_str(json_str)?;
 
@@ -136,7 +133,6 @@ pub fn filter_json_by_env(json_str: &str, env: &str) -> Result<String, serde_jso
     serde_json::to_string_pretty(&data)
 }
 
-/// Parse user’s prompt, find best match in your preferences
 pub fn find_best_match(prompt: &str, json_str: &str) -> Option<String> {
     let parsed_json: Value = serde_json::from_str(json_str).ok()?;
     let map = parsed_json.as_object()?;
@@ -163,7 +159,6 @@ pub fn find_best_match(prompt: &str, json_str: &str) -> Option<String> {
     best_match
 }
 
-/// Update the `current` value inside your JSON on the server
 pub async fn update_json_current_value(
     username: &str,
     base_command: &str,
@@ -180,7 +175,6 @@ pub async fn update_json_current_value(
 
     let mut found_match = false;
     for (_key, setting) in config.iter_mut() {
-        // Compare the environment-specific command
         if setting.commands.gnome.trim() == base_command.trim() {
             let new_val: DefaultValue = parse_new_value(new_value_str, &setting.current);
             setting.current = new_val;
@@ -233,7 +227,6 @@ pub async fn update_json_current_value(
     Ok(())
 }
 
-/// Helper for re-casting a new value to the correct enum variant
 fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultValue {
     match default_val {
         DefaultValue::Bool(_) => {
@@ -254,7 +247,6 @@ fn parse_new_value(new_value_str: &str, default_val: &DefaultValue) -> DefaultVa
     }
 }
 
-/// Gather valid commands for environment (to check we’re not running an invalid shell command)
 pub async fn gather_valid_commands_for_env(
     state: &crate::state::GenerateState,
     env: &str,
@@ -291,7 +283,6 @@ pub async fn gather_valid_commands_for_env(
     Ok(valid_commands)
 }
 
-// Very simple text-preprocessing
 fn preprocess_text(text: &str) -> std::collections::HashSet<String> {
     let stopwords: std::collections::HashSet<&str> = [
         "the", "is", "to", "a", "and", "for", "on", "in", "of", "with", 
@@ -310,7 +301,6 @@ fn preprocess_text(text: &str) -> std::collections::HashSet<String> {
         .collect()
 }
 
-/// Basic cosine similarity
 fn cosine_similarity(set1: &std::collections::HashSet<String>, set2: &std::collections::HashSet<String>) -> f64 {
     let intersection = set1.intersection(set2).count() as f64;
     let norm1 = set1.len() as f64;

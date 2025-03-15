@@ -139,7 +139,6 @@ function App() {
     } catch (err) {
       console.error("Error listening for encryption-offline event", err);
     }
-
   }
 
 

@@ -58,13 +58,12 @@ pub fn run() {
                 match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
                     Ok(client) => {
                         println!("EncryptionClient created successfully!");
-                        println!("Client ID: {}", client.client_id);
-                        println!("Shared Secret {:?}", client.shared_secret);
                         client
                     }
                     Err(e) => {
                         eprintln!("Failed to create EncryptionClient: {}", e);
-                        panic!("Failed to create EncryptionClient");
+                        app.emit_all("encryption-offline", "Encryption service is offline").unwrap();
+                        encryption::EncryptionClient::offline()
                     }
                 }
             })

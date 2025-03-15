@@ -73,6 +73,13 @@ impl EncryptionClient {
         })
     }
 
+    pub fn offline() -> Self {
+        Self {
+            shared_secret: Vec::new(),
+            client_id: String::new(),
+        }
+    }
+
     pub async fn initiate_kem(client_id: &str, server_url: &str) -> Result<String, String> {
         let client = Client::new();
         let response = client.post(format!("{}/kem/initiate", server_url))

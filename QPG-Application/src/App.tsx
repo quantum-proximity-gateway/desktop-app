@@ -136,7 +136,7 @@ function App() {
 
   function selectModel(model: string) {
     setSelectedModel(model);
-    setChatID(model);
+    setChatID(model + Date()); // Date to differentiate when new chats with same model started
     setMessages([{ sender: "", text: "" }]);
     setIsLoading(false);
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+
 import "./App.css";
 import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Code } from "@chakra-ui/react";
 import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton } from "@chakra-ui/modal";
@@ -130,20 +130,7 @@ function App() {
     setIsLoading(false);
   }
 
-  async function pingServer() {
-    try {
-      await listen("encryption-offline", (event) => {
-        console.log("Received encryption-offline event:", event);
-        setOnline(false);
-      });
-    } catch (err) {
-      console.error("Error listening for encryption-offline event", err);
-    }
-  }
-
-
   useEffect(() => {
-    pingServer();
     listModels();
     fetchPreferences();
   }, []);

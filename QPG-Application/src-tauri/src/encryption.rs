@@ -37,6 +37,7 @@ pub struct EncryptionResult {
 pub struct EncryptionClient {
     pub shared_secret: Vec<u8>,
     pub client_id: String,
+    pub status: bool
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -70,6 +71,7 @@ impl EncryptionClient {
         Ok(Self {
             shared_secret: results.secret,
             client_id,
+            status: true
         })
     }
 
@@ -77,6 +79,7 @@ impl EncryptionClient {
         Self {
             shared_secret: Vec::new(),
             client_id: String::new(),
+            status: false
         }
     }
 

@@ -1,6 +1,6 @@
 use tauri::Emitter;
 use tauri::Manager;
-
+use crate::state::EncryptionClientInstance;
 mod commands;
 mod preferences;
 mod state;
@@ -12,16 +12,23 @@ pub use commands::{
     init_startup_commands, list_models,
 };
 
+#[tauri::command]
+pub async fn checkEncryptionClient(
+    encryption_instance: State<'_, EncryptionClientInstance>
+) -> Result<bool, bool> {
+    encryption_instance
+
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(move |app| {
             let app_handle = app.app_handle();
             
-            // Manage GenerateState so it's available for startup commands
             app.manage(state::GenerateState::default());
             
-            // Initialize the EncryptionClient and register it as state
             let encryption_client = tauri::async_runtime::block_on(async {
                 match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
                     Ok(client) => {

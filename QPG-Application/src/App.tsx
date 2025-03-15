@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import "./App.css";
-import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Code } from "@chakra-ui/react";
-import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton } from "@chakra-ui/modal";
+import { Button, Input, Text, Box, VStack, HStack, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Code } from "@chakra-ui/react";
+import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody} from "@chakra-ui/modal";
 
 function App() {
   const [models, setModels] = useState([]);
@@ -102,7 +102,7 @@ function App() {
   }
 
   async function generate() {
-    if (isLoading || !prompt) { 
+    if (isLoading || !prompt) {
       return;
     }
     if (!selectedModel) {
@@ -217,7 +217,7 @@ function App() {
         <Text fontSize="2xl" textAlign="center">IBM Proximity Agents</Text>
         </Flex>
       )}
-          {!showWelcome && (
+      {!showWelcome && (
       <Box 
         className="App fadeIn" 
         p={6} 
@@ -269,81 +269,108 @@ function App() {
           borderBottomColor="gray.200"
         >
           <Text 
-            fontSize="2xl" 
+            fontSize="xl" 
             fontWeight="bold"
-            bgGradient="linear(to-r, blue.600, cyan.600)"
-            bgClip="text"
+            background="linear-gradient(to right, #2c3e50, #4286f4)"
+            backgroundClip="text"
           >
             IBM Proximity Agents
           </Text>
-          
-          <HStack>
-            <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
-              <DrawerTrigger asChild>
-                <Button 
-                  colorScheme="blue" 
-                  variant="ghost" 
-                  size="sm"
-                >
-                  <span style={{marginRight: '8px'}}>⚙️</span>
-                  Preferences
-                </Button>
-              </DrawerTrigger>
-              <DrawerBackdrop />
-              <DrawerContent>
-                <DrawerHeader>
-                  <DrawerTitle>Preferences</DrawerTitle>
-                </DrawerHeader>
-                <DrawerBody>
-                  {preferences ? (
-                    <>
-                      <Text fontWeight="bold" mb={2}>Current Preferences:</Text>
-                      <VStack align="start">
-                        {Object.entries(preferences).map(([key, settings], index) => (
-                          <Box key={index} borderWidth="1px" borderRadius="lg" p={4} width="100%" bg="white" shadow="sm">
-                            <Text fontWeight="bold" mb={1} color="blue.600">{key}</Text>
-                            <Text>Default: {settings.current.toString()}</Text>
-                            {settings.lower_bound !== undefined && (
-                              <Text>Lower Bound: {settings.lower_bound}</Text>
-                            )}
-                            {settings.upper_bound !== undefined && (
-                              <Text>Upper Bound: {settings.upper_bound}</Text>
-                            )}
-                            <Text mt={2} fontWeight="medium">Commands:</Text>
-                            <VStack align="start" pl={4} mt={1}>
-                              <Text><span style={{fontWeight: "500"}}>Windows:</span> {settings.commands.windows}</Text>
-                              <Text><span style={{fontWeight: "500"}}>MacOS:</span> {settings.commands.macos}</Text>
-                              <Text><span style={{fontWeight: "500"}}>GNOME:</span> {settings.commands.gnome}</Text>
-                            </VStack>
+        
+        <HStack>
+          <Button 
+            colorScheme="blue" 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setOpen(true)}
+          >
+            <span style={{marginRight: '8px'}}>⚙️</span>
+            Preferences
+          </Button>
+
+          <Modal isOpen={open} onClose={() => setOpen(false)} isCentered size="xl">
+            <ModalOverlay bg="rgba(0, 0, 0, 0.3)" backdropFilter="blur(10px)" />
+            <ModalContent borderRadius="lg" shadow="xl">
+              <ModalHeader borderBottomWidth="1px" borderColor="gray.200">
+                <Text fontSize="xl" fontWeight="bold">Preferences</Text>
+              </ModalHeader>
+              <ModalBody py={6}>
+                {preferences ? (
+                  <>
+                    <Text fontWeight="bold" mb={4}>Current Preferences:</Text>
+                    <VStack align="start">
+                      {Object.entries(preferences).map(([key, settings], index) => (
+                        <Box 
+                          key={index} 
+                          borderWidth="1px" 
+                          borderRadius="lg" 
+                          p={5} 
+                          width="100%" 
+                          bg="white" 
+                          shadow="md"
+                          transition="transform 0.2s"
+                          _hover={{ transform: "translateY(-2px)" }}
+                        >
+                          <Flex justify="space-between" align="center" mb={3}>
+                            <Text fontWeight="bold" fontSize="lg" color="blue.600">{key}</Text>
+                            <Text 
+                              py={1} 
+                              px={3} 
+                              bg="blue.50" 
+                              color="blue.700" 
+                              borderRadius="full" 
+                              fontSize="sm"
+                            >
+                              Current: {settings.current.toString()}
+                            </Text>
+                          </Flex>
+                          
+                          {(settings.lower_bound !== undefined || settings.upper_bound !== undefined) && (
+                            <Box mb={3} p={2} bg="gray.50" borderRadius="md">
+                              {settings.lower_bound !== undefined && (
+                                <Text fontSize="sm">Lower Bound: <Code>{settings.lower_bound}</Code></Text>
+                              )}
+                              {settings.upper_bound !== undefined && (
+                                <Text fontSize="sm">Upper Bound: <Code>{settings.upper_bound}</Code></Text>
+                              )}
+                            </Box>
+                          )}
+                          
+                          <Text mt={2} fontWeight="medium" mb={2}>Commands:</Text>
+                          <Box pl={2} borderLeftWidth="2px" borderColor="blue.200">
+                            <Text mb={2}><Code>Windows:</Code> {settings.commands.windows}</Text>
+                            <Text mb={2}><Code>MacOS:</Code> {settings.commands.macos}</Text>
+                            <Text><Code>GNOME:</Code> {settings.commands.gnome}</Text>
                           </Box>
-                        ))}
-                      </VStack>
-                    </>
-                  ) : (
-                    <Flex justify="center" align="center" height="200px">
-                      <Spinner size="lg" color="blue.500" mr={4} />
-                      <Text>Loading preferences...</Text>
-                    </Flex>
-                  )}
-                </DrawerBody>
-                <DrawerFooter>
-                  <DrawerCloseTrigger asChild>
-                    <Button colorScheme="blue">Close</Button>
-                  </DrawerCloseTrigger>
-                </DrawerFooter>
-              </DrawerContent>
-            </DrawerRoot>
-            
-            <Button 
-              colorScheme="blue" 
-              variant="ghost" 
-              size="sm"
-            >
-              <span style={{marginRight: '8px'}}>🔄</span>
-              Switch Agent
-            </Button>
-          </HStack>
-        </Flex>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </>
+                ) : (
+                  <Flex justify="center" align="center" height="200px">
+                    <Spinner size="lg" color="blue.500" mr={4} />
+                    <Text>Loading preferences...</Text>
+                  </Flex>
+                )}
+              </ModalBody>
+              <ModalFooter borderTopWidth="1px" borderColor="gray.200">
+                <Button colorScheme="blue" onClick={() => setOpen(false)}>
+                  Close
+                </Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
+                    
+          <Button 
+            colorScheme="blue" 
+            variant="ghost" 
+            size="sm"
+          >
+            <span style={{marginRight: '8px'}}>🔄</span>
+            Switch Agent
+          </Button>
+        </HStack>
+      </Flex>
         
         {!online && (
           <Box 

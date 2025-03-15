@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import "./App.css";
@@ -9,7 +9,7 @@ function App() {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState([{ sender: "", text: "" }]);
+  const [messages, setMessages] = useState<MessageType[]>([{ sender: "", text: "" }]);
   const [chatID, setChatID] = useState("");
   const [preferences, setPreferences] = useState<AppConfig | null>(null);
   const [open, setOpen] = useState(false)
@@ -18,6 +18,18 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCommand, setPendingCommand] = useState<string | null>(null);
   const [online, setOnline] = useState<boolean>(true);
+
+
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -47,6 +59,13 @@ function App() {
     command?: string;
   };
 
+
+  type MessageType = {
+    sender: string;
+    text: string;
+    timestamp?: Date;
+  };
+  
   type ChatMessage = {
     role: string;
     content: string;
@@ -104,7 +123,8 @@ function App() {
   
     const botMessage = { 
       sender: "bot", 
-      text: result.ollama_response.message.content 
+      text: result.ollama_response.message.content,
+      timestamp: new Date()
     };
     
     setMessages([...messages, userMessage, botMessage]);
@@ -278,7 +298,7 @@ function App() {
                   {preferences ? (
                     <>
                       <Text fontWeight="bold" mb={2}>Current Preferences:</Text>
-                      <VStack align="start" spacing={4}>
+                      <VStack align="start">
                         {Object.entries(preferences).map(([key, settings], index) => (
                           <Box key={index} borderWidth="1px" borderRadius="lg" p={4} width="100%" bg="white" shadow="sm">
                             <Text fontWeight="bold" mb={1} color="blue.600">{key}</Text>
@@ -403,6 +423,16 @@ function App() {
                 className={`chat-bubble ${message.sender === "user" ? "user-bubble" : "bot-bubble"}`}
               >
                 {message.text}
+                {message.timestamp && (
+                  <Text 
+                    fontSize="xs" 
+                    opacity={0.7} 
+                    textAlign="right" 
+                    mt={1}
+                  >
+                    {message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </Text>
+                )}
               </Box>
             ))}
             
@@ -412,6 +442,7 @@ function App() {
                 <Text>Thinking...</Text>
               </Flex>
             )}
+            <div ref={messagesEndRef} />
           </Box>
           
           <HStack 

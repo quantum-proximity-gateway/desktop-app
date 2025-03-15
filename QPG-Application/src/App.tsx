@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import "./App.css";
-import { Button, Input, Text, Box, VStack, HStack, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Code } from "@chakra-ui/react";
+import { Button, Input, Text, Box, VStack, HStack, Flex, Spinner, Code } from "@chakra-ui/react";
 import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody} from "@chakra-ui/modal";
 
 function App() {
@@ -18,8 +18,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCommand, setPendingCommand] = useState<string | null>(null);
   const [online, setOnline] = useState<boolean>(true);
-
-
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

@@ -94,10 +94,6 @@ function App() {
     setMessages([...messages, userMessage]);
     setPrompt("");
     setIsLoading(true);
-    // const response: Response = await invoke("generate", { request: { model: selectedModel, prompt, chat_id: chatID } });
-    // const botMessage = { sender: "bot", text: response.message.content };
-    // setMessages([...messages, userMessage, botMessage]);
-    // setIsLoading(false);
     const result = await invoke<GenerateResult>("generate", { 
       request: { 
         model: selectedModel, 
@@ -150,6 +146,41 @@ function App() {
         from { opacity: 1; }
         to { opacity: 0; }
       }
+      .chat-bubble {
+        padding: 12px 16px;
+        border-radius: 18px;
+        max-width: 80%;
+        margin-bottom: 10px;
+        word-wrap: break-word;
+        position: relative;
+        animation: fadeIn 0.3s ease;
+      }
+      .user-bubble {
+        background-color: #0078D4;
+        color: white;
+        border-bottom-right-radius: 4px;
+        margin-left: auto;
+      }
+      .bot-bubble {
+        background-color: #f0f0f0;
+        color: #333;
+        border-bottom-left-radius: 4px;
+        margin-right: auto;
+      }
+      .model-button {
+        transition: all 0.2s ease;
+        border-radius: 20px;
+        font-weight: 500;
+      }
+      .model-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .model-button.active {
+        background: linear-gradient(135deg, #0062E6, #33AEFF);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
     `}</style>
 
     
@@ -166,8 +197,15 @@ function App() {
         <Text fontSize="2xl" textAlign="center">IBM Proximity Agents</Text>
         </Flex>
       )}
-      {!showWelcome && (
-        <Box className="App fadeIn" p={4} display="flex" flexDirection="column" height="100vh">
+          {!showWelcome && (
+      <Box 
+        className="App fadeIn" 
+        p={6} 
+        display="flex" 
+        flexDirection="column" 
+        height="100vh"
+        bg="gray.50"
+      >
         <Modal isOpen={!!pendingCommand} onClose={() => setPendingCommand(null)} isCentered>
           <ModalOverlay bg="rgba(0, 0, 0, 0.6)" backdropFilter="blur(10px)" />
           <ModalContent borderRadius="xl" boxShadow="lg">
@@ -200,109 +238,217 @@ function App() {
             </ModalFooter>
           </ModalContent>
         </Modal>
-        <Text fontSize="2xl" textAlign="center" mb={4}>IBM Proximity Agents - Accessibility Preferences</Text>
+        
+        <Flex 
+          direction="row" 
+          justify="space-between" 
+          align="center" 
+          mb={6} 
+          pb={4}
+          borderBottomWidth="1px"
+          borderBottomColor="gray.200"
+        >
+          <Text 
+            fontSize="2xl" 
+            fontWeight="bold"
+            bgGradient="linear(to-r, blue.600, cyan.600)"
+            bgClip="text"
+          >
+            IBM Proximity Agents
+          </Text>
+          
+          <HStack>
+            <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
+              <DrawerTrigger asChild>
+                <Button 
+                  colorScheme="blue" 
+                  variant="ghost" 
+                  size="sm"
+                >
+                  <span style={{marginRight: '8px'}}>⚙️</span>
+                  Preferences
+                </Button>
+              </DrawerTrigger>
+              <DrawerBackdrop />
+              <DrawerContent>
+                <DrawerHeader>
+                  <DrawerTitle>Preferences</DrawerTitle>
+                </DrawerHeader>
+                <DrawerBody>
+                  {preferences ? (
+                    <>
+                      <Text fontWeight="bold" mb={2}>Current Preferences:</Text>
+                      <VStack align="start" spacing={4}>
+                        {Object.entries(preferences).map(([key, settings], index) => (
+                          <Box key={index} borderWidth="1px" borderRadius="lg" p={4} width="100%" bg="white" shadow="sm">
+                            <Text fontWeight="bold" mb={1} color="blue.600">{key}</Text>
+                            <Text>Default: {settings.current.toString()}</Text>
+                            {settings.lower_bound !== undefined && (
+                              <Text>Lower Bound: {settings.lower_bound}</Text>
+                            )}
+                            {settings.upper_bound !== undefined && (
+                              <Text>Upper Bound: {settings.upper_bound}</Text>
+                            )}
+                            <Text mt={2} fontWeight="medium">Commands:</Text>
+                            <VStack align="start" pl={4} mt={1}>
+                              <Text><span style={{fontWeight: "500"}}>Windows:</span> {settings.commands.windows}</Text>
+                              <Text><span style={{fontWeight: "500"}}>MacOS:</span> {settings.commands.macos}</Text>
+                              <Text><span style={{fontWeight: "500"}}>GNOME:</span> {settings.commands.gnome}</Text>
+                            </VStack>
+                          </Box>
+                        ))}
+                      </VStack>
+                    </>
+                  ) : (
+                    <Flex justify="center" align="center" height="200px">
+                      <Spinner size="lg" color="blue.500" mr={4} />
+                      <Text>Loading preferences...</Text>
+                    </Flex>
+                  )}
+                </DrawerBody>
+                <DrawerFooter>
+                  <DrawerCloseTrigger asChild>
+                    <Button colorScheme="blue">Close</Button>
+                  </DrawerCloseTrigger>
+                </DrawerFooter>
+              </DrawerContent>
+            </DrawerRoot>
+            
+            <Button 
+              colorScheme="blue" 
+              variant="ghost" 
+              size="sm"
+            >
+              <span style={{marginRight: '8px'}}>🔄</span>
+              Switch Agent
+            </Button>
+          </HStack>
+        </Flex>
+        
         {!online && (
           <Box 
-            bg="red.200" 
+            bg="red.100" 
             p={4}
             textAlign="center"
             borderRadius="md"
             mb={4}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            gap={2}
           >
-            <Text color="red.800" fontSize="lg">
+            <span style={{fontSize: "18px"}}>⚠️</span>
+            <Text color="red.800" fontSize="md" fontWeight="medium">
               Server is offline, changes will not be saved.
             </Text>
           </Box>
         )}
-        <Flex direction="row" justify="center" align="center" mb={4} gap={50}>
-        <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
-          <DrawerBackdrop />
-          <DrawerTrigger asChild>
-            <Button variant="outline" size="sm" minWidth="15%">
-              Preferences
-            </Button>
-          </DrawerTrigger>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Preferences</DrawerTitle>
-            </DrawerHeader>
-            <DrawerBody>
-              {preferences ? (
-                <>
-                  <Text fontWeight="bold" mb={2}>Current Preferences:</Text>
-                  <VStack align="start">
-                    {Object.entries(preferences).map(([key, settings], index) => (
-                      <Box key={index} borderWidth="1px" borderRadius="md" p={4} width="100%">
-                        <Text fontWeight="bold" mb={1}>{key}</Text>
-                        <Text>Default: {settings.current.toString()}</Text>
-                        {settings.lower_bound !== undefined && (
-                          <Text>Lower Bound: {settings.lower_bound}</Text>
-                        )}
-                        {settings.upper_bound !== undefined && (
-                          <Text>Upper Bound: {settings.upper_bound}</Text>
-                        )}
-                        <Text>Commands:</Text>
-                        <VStack align="start" pl={4}>
-                          <Text>Windows: {settings.commands.windows}</Text>
-                          <Text>MacOS: {settings.commands.macos}</Text>
-                          <Text>GNOME: {settings.commands.gnome}</Text>
-                        </VStack>
-                      </Box>
-                    ))}
-                  </VStack>
-                </>
-              ) : (
-                <Text>Loading preferences...</Text>
-              )}
-            </DrawerBody>
-            <DrawerFooter>
-              <DrawerActionTrigger asChild>
-                <Button variant="outline">Close</Button>
-              </DrawerActionTrigger>
-            </DrawerFooter>
-            <DrawerCloseTrigger />
-          </DrawerContent>
-        </DrawerRoot>
-        <Button variant="outline" size="sm" minWidth="15%">
-            Switch Proximity Agent
-        </Button>
-        </Flex>
-        <VStack align="stretch" flex="1" mt={4}>
-          <Box>
-            <Text fontSize="xl" textAlign="center">Available models</Text>
-            <HStack mt={2} justifyContent="center">
-              {models.sort().map((model, index) => (
-                <Button key={index} onClick={() => selectModel(model) } bg={selectedModel == model ? "gray.400": "white"} minWidth={`${75 / models.length}%`}>{model}</Button>
-              ))}
-            </HStack>
-          </Box>
-          <Box border="1px" borderColor="gray.200" borderRadius="md" p={4} h="400px" overflowY="scroll" flex="1">
-            {messages.map((message, index) => (
-              <Box key={index} mb={2} textAlign={message.sender === "user" ? "right" : "left"}>
-                <Text fontWeight={message.sender === "user" ? "bold" : "normal"}>{message.text}</Text>
+        
+        <Box mb={5}>
+          <Text fontSize="md" fontWeight="medium" mb={3} color="gray.600" textAlign="center">Select a model to begin</Text>
+          <Flex justifyContent="center" wrap="wrap" gap={2}>
+            {models.sort().map((model, index) => (
+              <Button 
+                key={index} 
+                onClick={() => selectModel(model)}
+                className={`model-button ${selectedModel === model ? 'active' : ''}`}
+                bg={selectedModel === model ? "transparent" : "white"}
+                border="1px solid"
+                borderColor={selectedModel === model ? "transparent" : "gray.200"}
+                size="md"
+                px={4}
+              >
+                {model}
+              </Button>
+            ))}
+          </Flex>
+        </Box>
+        
+        <Box 
+          flex="1" 
+          borderRadius="xl" 
+          bg="white" 
+          shadow="sm"
+          border="1px" 
+          borderColor="gray.200" 
+          p={0}
+          overflow="hidden"
+          display="flex"
+          flexDirection="column"
+        >
+          <Box 
+            p={4} 
+            overflowY="auto" 
+            flex="1" 
+            id="chat-messages"
+            css={{
+              "&::-webkit-scrollbar": {
+                width: "8px",
+              },
+              "&::-webkit-scrollbar-track": {
+                background: "#f1f1f1",
+              },
+              "&::-webkit-scrollbar-thumb": {
+                background: "#c5c5c5",
+                borderRadius: "4px",
+              },
+              "&::-webkit-scrollbar-thumb:hover": {
+                background: "#a1a1a1",
+              },
+            }}
+          >
+            {messages.filter(msg => msg.sender !== "").map((message, index) => (
+              <Box 
+                key={index} 
+                className={`chat-bubble ${message.sender === "user" ? "user-bubble" : "bot-bubble"}`}
+              >
+                {message.text}
               </Box>
             ))}
+            
             {isLoading && (
-              <Box textAlign="center">
-                <Spinner size="sm"/>
-                <Text>Generating response...</Text>
-              </Box>)}
+              <Flex align="center" my={4} className="chat-bubble bot-bubble">
+                <Spinner size="sm" color="blue.500" mr={3}/>
+                <Text>Thinking...</Text>
+              </Flex>
+            )}
           </Box>
-          <HStack mt={4}>
-            <Input onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    generate();
-                  }
-                }} 
-                placeholder="Type your prompt:" 
-                value={prompt} 
-                onChange={(e) => setPrompt(e.target.value)} />
-            <Button onClick={generate}>Send</Button>
+          
+          <HStack 
+            p={4}
+            borderTopWidth="1px"
+            borderTopColor="gray.200"
+            bg="gray.50"
+          >
+            <Input 
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  generate();
+                }
+              }} 
+              placeholder={selectedModel ? "Type your message..." : "Select a model to start chatting"} 
+              value={prompt} 
+              onChange={(e) => setPrompt(e.target.value)}
+              variant="outline"
+              bg="white"
+              borderRadius="full"
+              size="lg"
+              disabled={!selectedModel || isLoading}
+            />
+            <Button 
+              onClick={generate}
+              disabled={!selectedModel || isLoading || !prompt}
+              colorScheme="blue"
+              borderRadius="full"
+              size="lg"
+              px={6}
+            >
+              Send
+            </Button>
           </HStack>
-        </VStack>
+        </Box>
       </Box>
-
-      )}
+    )}
     
     </>
   );

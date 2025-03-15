@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 import { Button, Input, Text, Box, VStack, HStack, DrawerActionTrigger, DrawerBackdrop, DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle, DrawerTrigger, Flex, Spinner, Code } from "@chakra-ui/react";
 import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton } from "@chakra-ui/modal";
@@ -16,6 +17,7 @@ function App() {
   const [isFading, setIsFading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCommand, setPendingCommand] = useState<string | null>(null);
+  const [online, setOnline] = useState<boolean>(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -128,8 +130,21 @@ function App() {
     setIsLoading(false);
   }
 
+  async function pingServer() {
+    try {
+      await listen("encryption-offline", (event) => {
+        console.log("Received encryption-offline event:", event);
+        setOnline(false);
+      });
+    } catch (err) {
+      console.error("Error listening for encryption-offline event", err);
+    }
+
+  }
+
 
   useEffect(() => {
+    pingServer();
     listModels();
     fetchPreferences();
   }, []);
@@ -152,6 +167,14 @@ function App() {
         to { opacity: 0; }
       }
     `}</style>
+
+    {!online && (
+      <Box bg="red.100" p={4} textAlign="center">
+        <Text color="red.800" fontSize="lg">
+          Encryption service is offline
+        </Text>
+      </Box>
+    )}
     {showWelcome && (
         <Flex
         direction="column"

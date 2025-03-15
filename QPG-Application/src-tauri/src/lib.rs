@@ -1,4 +1,4 @@
-use tauri::async_runtime::block_on;
+use tauri::Emitter;
 use tauri::Manager;
 
 mod commands;
@@ -16,19 +16,41 @@ pub use commands::{
 pub fn run() {
     tauri::Builder::default()
         .setup(move |app| {
+            let app_handle = app.app_handle();
+            
+            // Manage GenerateState so it's available for startup commands
+            app.manage(state::GenerateState::default());
+            
+            // Initialize the EncryptionClient and register it as state
+            let encryption_client = tauri::async_runtime::block_on(async {
+                match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
+                    Ok(client) => {
+                        println!("EncryptionClient created successfully!");
+                        client
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to create EncryptionClient: {}", e);
+                        app_handle.emit("encryption-offline", "Encryption service is offline").unwrap();
+                        encryption::EncryptionClient::offline()
+                    }
+                }
+            });
+            app.manage(state::EncryptionClientInstance(tauri::async_runtime::Mutex::new(
+                encryption_client
+            )));
+            
+            // Now that the required state is managed, run the startup commands.
             let handle = app.app_handle();
-
             tauri::async_runtime::block_on(async move {
                 let encryption_instance = handle.state::<state::EncryptionClientInstance>();
                 let generate_state = handle.state::<state::GenerateState>();
-
+                
                 if let Err(err) = commands::startup::init_startup_commands(
                     handle.clone(),
                     encryption_instance.clone(),
                     generate_state.clone(),
                 )
-                .await
-                {
+                .await {
                     eprintln!("Failed to run startup init: {}", err);
                 }
             });
@@ -37,22 +59,6 @@ pub fn run() {
         })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(state::EncryptionClientInstance(tauri::async_runtime::Mutex::new({
-            let app_handle = app.app_handle();
-            block_on(async move {
-                match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
-                    Ok(client) => {
-                        println!("EncryptionClient created successfully!");
-                        client
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to create EncryptionClient: {}", e);
-                        app_handle.emit_all("encryption-offline", "Encryption service is offline").unwrap();
-                        encryption::EncryptionClient::offline()
-                    }
-                }
-            })
-        })))
         .manage(state::OllamaInstance(tauri::async_runtime::Mutex::new(
             ollama_rs::Ollama::new_with_history_from_url(
                 url::Url::parse(preferences::OLLAMA_BASE_URL).unwrap(),

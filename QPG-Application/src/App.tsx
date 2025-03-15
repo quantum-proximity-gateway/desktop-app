@@ -152,55 +152,6 @@ function App() {
   return (
     <>
     <style>{`
-      .fadeIn {
-        animation: fadeIn 1s ease-in forwards;
-      }
-      .fadeOut {
-        animation: fadeOut 1s ease-out forwards;
-      }
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes fadeOut {
-        from { opacity: 1; }
-        to { opacity: 0; }
-      }
-      .chat-bubble {
-        padding: 12px 16px;
-        border-radius: 18px;
-        max-width: 80%;
-        margin-bottom: 10px;
-        word-wrap: break-word;
-        position: relative;
-        animation: fadeIn 0.3s ease;
-      }
-      .user-bubble {
-        background-color: #0078D4;
-        color: white;
-        border-bottom-right-radius: 4px;
-        margin-left: auto;
-      }
-      .bot-bubble {
-        background-color: #f0f0f0;
-        color: #333;
-        border-bottom-left-radius: 4px;
-        margin-right: auto;
-      }
-      .model-button {
-        transition: all 0.2s ease;
-        border-radius: 20px;
-        font-weight: 500;
-      }
-      .model-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      }
-      .model-button.active {
-        background: linear-gradient(135deg, #0062E6, #33AEFF);
-        color: white;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      }
     `}</style>
 
     

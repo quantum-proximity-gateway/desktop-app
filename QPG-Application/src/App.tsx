@@ -152,13 +152,7 @@ function App() {
       }
     `}</style>
 
-    {!online && (
-      <Box bg="red.100" p={4} textAlign="center">
-        <Text color="red.800" fontSize="lg">
-          Encryption service is offline
-        </Text>
-      </Box>
-    )}
+    
     {showWelcome && (
         <Flex
         direction="column"
@@ -174,38 +168,52 @@ function App() {
       )}
       {!showWelcome && (
         <Box className="App fadeIn" p={4} display="flex" flexDirection="column" height="100vh">
-        <Modal isOpen={!!pendingCommand} onClose={() => setPendingCommand(null)}>
-          <ModalOverlay />
-            <ModalContent>
-              <Box bg="gray.400">
-              <ModalHeader>Confirm Command Execution</ModalHeader>
-              <ModalCloseButton />
-              <ModalBody>
-                <Text>Run this command?</Text>
-                <Code p={2} my={2} display="block">{pendingCommand}</Code>
-                <Text>This will modify your system settings.</Text>
-              </ModalBody>
-              <ModalFooter>
-                <Button mr={3} onClick={() => setPendingCommand(null)}>
-                  Cancel
-                </Button>
-                <Button colorScheme="blue" onClick={async () => {
-                  if (pendingCommand) {
-                    try {
-			await invoke("execute_command", { command: pendingCommand, update: true });
-                    } catch (error) {
-                      alert(`Error: ${error}`);
-                    }
-                    setPendingCommand(null);
+        <Modal isOpen={!!pendingCommand} onClose={() => setPendingCommand(null)} isCentered>
+          <ModalOverlay bg="rgba(0, 0, 0, 0.6)" backdropFilter="blur(10px)" />
+          <ModalContent borderRadius="xl" boxShadow="lg">
+            <ModalHeader fontWeight="bold" fontSize="4xl" textAlign="center">
+              Confirm Command Execution
+            </ModalHeader>
+            <ModalBody display="flex" flexDirection="column" alignItems="center">
+              <Text mb={2} textAlign="center">Would you like to execute this command?</Text>
+              <Code p={2} my={2} display="block" width="100%" textAlign="center">
+                {pendingCommand}
+              </Code>
+              <Text textAlign="center">This will modify your system settings.</Text>
+            </ModalBody>
+            <ModalFooter display="flex" justifyContent="center">
+              <Button mr={3} onClick={() => setPendingCommand(null)}>
+                Cancel
+              </Button>
+              <Button colorScheme="blue" onClick={async () => {
+                if (pendingCommand) {
+                  try {
+                    await invoke("execute_command", { command: pendingCommand, update: true });
+                  } catch (error) {
+                    alert(`Error: ${error}`);
                   }
-                }}>
-                  Execute
-                </Button>
-              </ModalFooter>
-            </Box>
-            </ModalContent>
+                  setPendingCommand(null);
+                }
+              }}>
+                Execute
+              </Button>
+            </ModalFooter>
+          </ModalContent>
         </Modal>
         <Text fontSize="2xl" textAlign="center" mb={4}>IBM Proximity Agents - Accessibility Preferences</Text>
+        {!online && (
+          <Box 
+            bg="red.200" 
+            p={4}
+            textAlign="center"
+            borderRadius="md"
+            mb={4}
+          >
+            <Text color="red.800" fontSize="lg">
+              Server is offline, changes will not be saved.
+            </Text>
+          </Box>
+        )}
         <Flex direction="row" justify="center" align="center" mb={4} gap={50}>
         <DrawerRoot open={open} onOpenChange={(e) => setOpen(e.open)}>
           <DrawerBackdrop />

@@ -33,28 +33,13 @@ pub fn run() {
                 }
             });
 
-            #[cfg(desktop)]
-            {
-                use tauri_plugin_autostart::MacosLauncher;
-                use tauri_plugin_autostart::ManagerExt;
-
-                let _ = app.handle().plugin(tauri_plugin_autostart::init(
-                    MacosLauncher::LaunchAgent,
-                    Some(vec!["--flag1", "--flag2"]),
-                ));
-
-                let autostart_manager = app.autolaunch();
-                let _ = autostart_manager.enable();
-                println!("registered for autostart? {}", autostart_manager.is_enabled().unwrap());
-                let _ = autostart_manager.disable();
-            }
-
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(state::EncryptionClientInstance(tauri::async_runtime::Mutex::new(
-            block_on(async {
+        .manage(state::EncryptionClientInstance(tauri::async_runtime::Mutex::new({
+            let app_handle = app.app_handle();
+            block_on(async move {
                 match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
                     Ok(client) => {
                         println!("EncryptionClient created successfully!");
@@ -62,12 +47,12 @@ pub fn run() {
                     }
                     Err(e) => {
                         eprintln!("Failed to create EncryptionClient: {}", e);
-                        app.emit_all("encryption-offline", "Encryption service is offline").unwrap();
+                        app_handle.emit_all("encryption-offline", "Encryption service is offline").unwrap();
                         encryption::EncryptionClient::offline()
                     }
                 }
             })
-        )))
+        })))
         .manage(state::OllamaInstance(tauri::async_runtime::Mutex::new(
             ollama_rs::Ollama::new_with_history_from_url(
                 url::Url::parse(preferences::OLLAMA_BASE_URL).unwrap(),

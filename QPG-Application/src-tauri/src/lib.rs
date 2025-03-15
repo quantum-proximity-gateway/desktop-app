@@ -1,6 +1,5 @@
 use tauri::Emitter;
 use tauri::Manager;
-use crate::state::EncryptionClientInstance;
 mod commands;
 mod preferences;
 mod state;
@@ -9,17 +8,8 @@ mod models;
 
 pub use commands::{
     execute_command, fetch_preferences, generate, get_username,
-    init_startup_commands, list_models,
+    init_startup_commands, list_models, check_encryption_client
 };
-
-#[tauri::command]
-pub async fn checkEncryptionClient(
-    encryption_instance: State<'_, EncryptionClientInstance>
-) -> Result<bool, bool> {
-    encryption_instance
-
-}
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -80,7 +70,8 @@ pub fn run() {
             generate,
             fetch_preferences,
             execute_command,
-            get_username
+            get_username,
+            check_encryption_client
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

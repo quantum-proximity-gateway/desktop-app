@@ -33,6 +33,10 @@ function App() {
     setModels(await invoke("list_models"));
   }
 
+  async function pingStatus() {
+    setOnline(await invoke("check_encryption_client"));
+  }
+
   type GenerateResult = {
     ollama_response: {
       model: string;
@@ -42,13 +46,6 @@ function App() {
     };
     command?: string;
   };
-
-  // type Response = {
-  //   model: string;
-  //   created_at: string;
-  //   message: ChatMessage;
-  //   done: boolean;
-  // };
 
   type ChatMessage = {
     role: string;
@@ -131,6 +128,7 @@ function App() {
   }
 
   useEffect(() => {
+    pingStatus();
     listModels();
     fetchPreferences();
   }, []);

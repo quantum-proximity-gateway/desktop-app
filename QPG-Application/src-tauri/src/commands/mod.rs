@@ -40,6 +40,14 @@ pub async fn list_models() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub async fn check_encryption_client(
+    encryption_instance: State<'_, EncryptionClientInstance>
+) -> Result<bool, bool> {
+    let encryption_client = encryption_instance.0.lock().await;
+    Ok(encryption_client.status)
+}
+
+#[tauri::command]
 pub async fn get_username(app_handle: tauri::AppHandle) -> Result<String, String> {
     let shell = app_handle.shell();
 

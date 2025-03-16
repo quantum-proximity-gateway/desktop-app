@@ -1,6 +1,5 @@
-use tauri::async_runtime::block_on;
+use tauri::Emitter;
 use tauri::Manager;
-
 mod commands;
 mod preferences;
 mod state;
@@ -9,66 +8,54 @@ mod models;
 
 pub use commands::{
     execute_command, fetch_preferences, generate, get_username,
-    init_startup_commands, list_models,
+    init_startup_commands, list_models, check_encryption_client
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(move |app| {
+            let app_handle = app.app_handle();
+            
+            app.manage(state::GenerateState::default());
+            
+            let encryption_client = tauri::async_runtime::block_on(async {
+                match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
+                    Ok(client) => {
+                        println!("EncryptionClient created successfully!");
+                        client
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to create EncryptionClient: {}", e);
+                        app_handle.emit("encryption-offline", "Encryption service is offline").unwrap();
+                        encryption::EncryptionClient::offline()
+                    }
+                }
+            });
+            app.manage(state::EncryptionClientInstance(tauri::async_runtime::Mutex::new(
+                encryption_client
+            )));
+            
+            // Now that the required state is managed, run the startup commands.
             let handle = app.app_handle();
-
             tauri::async_runtime::block_on(async move {
                 let encryption_instance = handle.state::<state::EncryptionClientInstance>();
                 let generate_state = handle.state::<state::GenerateState>();
-
+                
                 if let Err(err) = commands::startup::init_startup_commands(
                     handle.clone(),
                     encryption_instance.clone(),
                     generate_state.clone(),
                 )
-                .await
-                {
+                .await {
                     eprintln!("Failed to run startup init: {}", err);
                 }
             });
-
-            #[cfg(desktop)]
-            {
-                use tauri_plugin_autostart::MacosLauncher;
-                use tauri_plugin_autostart::ManagerExt;
-
-                let _ = app.handle().plugin(tauri_plugin_autostart::init(
-                    MacosLauncher::LaunchAgent,
-                    Some(vec!["--flag1", "--flag2"]),
-                ));
-
-                let autostart_manager = app.autolaunch();
-                let _ = autostart_manager.enable();
-                println!("registered for autostart? {}", autostart_manager.is_enabled().unwrap());
-                let _ = autostart_manager.disable();
-            }
 
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(state::EncryptionClientInstance(tauri::async_runtime::Mutex::new(
-            block_on(async {
-                match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
-                    Ok(client) => {
-                        println!("EncryptionClient created successfully!");
-                        println!("Client ID: {}", client.client_id);
-                        println!("Shared Secret {:?}", client.shared_secret);
-                        client
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to create EncryptionClient: {}", e);
-                        panic!("Failed to create EncryptionClient");
-                    }
-                }
-            })
-        )))
         .manage(state::OllamaInstance(tauri::async_runtime::Mutex::new(
             ollama_rs::Ollama::new_with_history_from_url(
                 url::Url::parse(preferences::OLLAMA_BASE_URL).unwrap(),
@@ -83,7 +70,8 @@ pub fn run() {
             generate,
             fetch_preferences,
             execute_command,
-            get_username
+            get_username,
+            check_encryption_client
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

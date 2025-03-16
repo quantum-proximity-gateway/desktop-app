@@ -6,8 +6,8 @@ use crate::state::{EncryptionClientInstance, GenerateState};
 use crate::models::{AppConfig, Setting, UpdateJSONPreferencesRequest, DefaultValue};
 use crate::encryption::DecryptData;
 
-pub const OLLAMA_BASE_URL: &str = "https://c61e-144-82-8-183.ngrok-free.app";
-pub const SERVER_URL: &str = "https://3ef1-31-205-125-238.ngrok-free.app";
+pub const OLLAMA_BASE_URL: &str = "http://127.0.0.1:11434";
+pub const SERVER_URL: &str = "http://127.0.0.1:8000";
 
 pub async fn fetch_preferences_impl(
     username: &str,

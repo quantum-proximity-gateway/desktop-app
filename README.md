@@ -1,5 +1,15 @@
 # QPG Desktop Application
 
+## Requirements
+
+- NodeJS
+
+- Cargo
+
+### Optional
+
+- For proper command execution, must run on a GNOME-based GUI (any flavour of Linux e.g. Kali-Linux)
+
 ## Installation
 
 To install the dependencies, run:

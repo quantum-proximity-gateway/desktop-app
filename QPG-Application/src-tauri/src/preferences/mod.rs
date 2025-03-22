@@ -7,7 +7,7 @@ use crate::models::{AppConfig, Setting, UpdateJSONPreferencesRequest, DefaultVal
 use crate::encryption::DecryptData;
 
 pub const OLLAMA_BASE_URL: &str = "http://127.0.0.1:11434";
-pub const SERVER_URL: &str = "http://127.0.0.1:8000";
+pub const SERVER_URL: &str = "https://litestar-server.1t65wn3ankpt.eu-gb.codeengine.appdomain.cloud";
 
 pub async fn fetch_preferences_impl(
     username: &str,

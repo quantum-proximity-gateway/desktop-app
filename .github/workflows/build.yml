@@ -1,0 +1,100 @@
+name: 'publish'
+
+on:
+  push:
+    branches:
+      - release
+      - ci-cd-for-building
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon (M1 and above)
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+            archTag: 'macOS-ARM'  # We'll use this to name the artifact more clearly.
+
+          # macOS Intel
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+            archTag: 'macOS-Intel'
+
+          # Linux (Ubuntu 22.04)
+          - platform: 'ubuntu-22.04'
+            args: ''
+            archTag: 'Linux'
+
+          # Windows
+          - platform: 'windows-latest'
+            args: ''
+            archTag: 'Windows'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      # 1) Check out the repo
+      - uses: actions/checkout@v4
+
+      # 2) If on Ubuntu, install extra dependencies
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          # For Tauri v1, you need libwebkit2gtk-4.0-dev. 
+          # For Tauri v2, you need libwebkit2gtk-4.1-dev. 
+          # If you're on Tauri v2, you could remove 4.0 to speed up the workflow.
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      # 3) Set up Node
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'  # or 'yarn' / 'pnpm' if you use something else
+
+      # 4) Install Rust
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Only install macOS targets if we're on a macOS runner
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      # 5) Enable Rust caching to speed builds
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './QPG-Application/src-tauri -> target'
+
+      # 6) Install front-end dependencies. 
+      # Note: We'll run this in the QPG-Application subfolder where package.json lives.
+      - name: install frontend dependencies
+        working-directory: ./QPG-Application
+        run: npm install
+
+      # (Optional) If your Tauri config requires a custom front-end build step (like "npm run build"),
+      # do that here. For example:
+      - name: build front end
+        working-directory: ./QPG-Application
+        run: npm run tauri build
+
+      # 7) Use the Tauri action to build and publish a draft release
+      - name: build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: app-v__VERSION__
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'See the assets to download this version and install.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+      # 8) (Optional) If you want to rename or re-upload artifacts, you can add steps here.
+      # The tauri-action automatically uploads them to the draft release under "Assets".

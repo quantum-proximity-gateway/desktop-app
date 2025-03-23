@@ -6,6 +6,12 @@ Refer to the [Releases](https://github.com/quantum-proximity-gateway/desktop-app
 
 > NOTE: For proper command execution, you must run it on a GNOME-based GUI (any flavour of Linux e.g. Kali-Linux)
 
+## Running
+
+- Ensure ollama is running and active
+
+- Run the built application
+
 ---
 
 <br />
@@ -18,6 +24,8 @@ In case you want to change the code, below are the instructions to install and u
 
 - Cargo
 
+- Ollama
+
 ## Installation
 
 Navigate to the `QPG-Application/` directory.
@@ -29,6 +37,14 @@ npm install
 ```
 
 ## Usage
+
+Firstly, ensure that ollama is running. If it is not, run:
+
+```bash
+ollama serve
+```
+
+> NOTE: You can check if ollama is running by trying to access `http://localhost:11434` in a browser.
 
 To start the application, run:
 

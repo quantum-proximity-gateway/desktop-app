@@ -4,7 +4,7 @@
 
 Refer to the [Releases](https://github.com/quantum-proximity-gateway/desktop-app/releases/tag/app-v0.1.0) page to download and build the application.
 
-> NOTE: For proper command execution, you must run it on a GNOME-based GUI (any flavour of Linux e.g. Kali-Linux)
+> NOTE: For proper command execution, you must run it on a GNOME-based GUI (any flavour of Linux e.g. Kali-Linux).
 
 ## Running
 

@@ -7,8 +7,9 @@ mod encryption;
 mod models;
 
 pub use commands::{
-    execute_command, fetch_preferences, generate, get_username,
-    init_startup_commands, list_models, check_encryption_client
+    execute_command, execute_startup_app_command, fetch_preferences,
+    generate, get_username, init_startup_commands,
+    init_startup_apps, list_models, check_encryption_client
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -67,9 +68,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_models,
             init_startup_commands,
+	    init_startup_apps,
             generate,
             fetch_preferences,
             execute_command,
+	    execute_startup_app_command,
             get_username,
             check_encryption_client
         ])

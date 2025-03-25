@@ -2,6 +2,7 @@ pub mod startup;
 pub mod generation;
 
 pub use startup::init_startup_commands;
+pub use startup::init_startup_apps;
 
 use tauri::State;
 use crate::state::{EncryptionClientInstance, OllamaInstance, ChatIDs, GenerateState};
@@ -85,6 +86,19 @@ pub async fn execute_command(
         update,
         app_handle,
         encryption_instance,
+        state
+    ).await
+}
+
+#[tauri::command]
+pub async fn execute_startup_app_command(
+    command: String,
+    app_handle: tauri::AppHandle,
+    state: State<'_, GenerateState>,
+) -> Result<(), String> {
+    generation::execute_command_app_impl(
+        command,
+        app_handle,
         state
     ).await
 }

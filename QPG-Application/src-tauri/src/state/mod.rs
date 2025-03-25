@@ -14,6 +14,7 @@ pub struct GenerateState {
     full_json_example: RwLock<String>,
     filtered_json_example: RwLock<String>,
     best_match_json_example: RwLock<String>,
+    startup_apps: RwLock<Vec<String>>,
 }
 
 impl Default for GenerateState {
@@ -24,6 +25,10 @@ impl Default for GenerateState {
             full_json_example: RwLock::new(String::new()),
             filtered_json_example: RwLock::new(String::new()),
             best_match_json_example: RwLock::new(String::new()),
+	    startup_apps: RwLock::new(vec![
+		"gedit".to_string(),
+		"mousepad".to_string(),
+	    ]),
         }
     }
 }
@@ -59,6 +64,10 @@ impl GenerateState {
 
     pub async fn get_best_match_json(&self) -> String {
         self.best_match_json_example.read().await.clone()
+    }
+
+    pub async fn get_startup_apps(&self) -> Vec<String> {
+	self.startup_apps.read().await.clone()
     }
 
     pub async fn set_best_match_json(&self, value: &str) {

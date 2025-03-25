@@ -231,10 +231,11 @@ pub async fn execute_command_app_impl(
 	return Err(format!("Unrecognized/unauthorized command base: '{}'. Will not execute command.", command_base));
     }
 
-    println!("Attempting to run shell command: {}", command);
+    let bg_app_cmd = format!("nohup {} >/dev/null 2>&1 &", command_base);
+    println!("Attempting to run shell command: sh -c {}", bg_app_cmd);
     let shell = app_handle.shell();
 
-    match shell.command(&command_base).arg("&").output().await {
+    match shell.command("sh").args(["-c", &bg_app_cmd]).output().await {
 	Ok(output) => {
 	    if output.status.success() {
 		let stdout_str = String::from_utf8(output.stdout).unwrap_or_default();

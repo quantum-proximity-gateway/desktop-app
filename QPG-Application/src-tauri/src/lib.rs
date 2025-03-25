@@ -51,6 +51,14 @@ pub fn run() {
                 .await {
                     eprintln!("Failed to run startup init: {}", err);
                 }
+
+		if let Err(err) = commands::startup::init_startup_apps(
+                    handle.clone(),
+                    generate_state.clone(),
+                )
+                .await {
+                    eprintln!("Failed to run startup apps init: {}", err);
+                }
             });
 
             Ok(())

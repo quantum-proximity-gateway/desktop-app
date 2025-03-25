@@ -76,7 +76,7 @@ pub async fn init_startup_apps(
 
     for app in startup_apps {
 	let full_command = format!("{} &", app);
-	println!("[startup_apps_init] Launching: {}", full_command);
+	println!("[startup_apps_init] Launching: {}", full_command.trim_end_matches(" &").trim().to_string());
 
 	if let Err(e) = super::generation::execute_command_app_impl(
 	    full_command,

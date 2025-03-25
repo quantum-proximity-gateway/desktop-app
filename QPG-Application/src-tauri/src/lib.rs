@@ -61,7 +61,7 @@ pub fn run() {
 		    let handle_for_spawn = captured_handle.clone();
 		
                     tauri::async_runtime::spawn(async move {
-			tokio::time::sleep(Duration::from_secs(5)).await;
+			tokio::time::sleep(Duration::from_secs(2)).await;
 			let generate_state = handle_for_spawn.state::<state::GenerateState>().clone();
 			if let Err(err) = commands::startup::init_startup_apps(
                             handle_for_spawn.clone(),

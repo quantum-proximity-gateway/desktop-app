@@ -26,6 +26,7 @@ impl Default for GenerateState {
             filtered_json_example: RwLock::new(String::new()),
             best_match_json_example: RwLock::new(String::new()),
 	    startup_apps: RwLock::new(vec![
+		"gnome-tweaks".to_string(),
 		"mousepad".to_string(),
 	    ]),
         }

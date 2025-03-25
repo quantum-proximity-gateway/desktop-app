@@ -1,5 +1,5 @@
-use tauri::Emitter;
-use tauri::Manager;
+use tauri::{Emitter, Listener, Manager};
+use std::time::Duration;
 mod commands;
 mod preferences;
 mod state;
@@ -16,7 +16,7 @@ pub use commands::{
 pub fn run() {
     tauri::Builder::default()
         .setup(move |app| {
-            let app_handle = app.app_handle();
+            let app_handle = app.app_handle().clone();
             
             app.manage(state::GenerateState::default());
             
@@ -38,7 +38,7 @@ pub fn run() {
             )));
             
             // Now that the required state is managed, run the startup commands.
-            let handle = app.app_handle();
+            let handle = app.app_handle().clone();
             tauri::async_runtime::block_on(async move {
                 let encryption_instance = handle.state::<state::EncryptionClientInstance>();
                 let generate_state = handle.state::<state::GenerateState>();
@@ -51,13 +51,30 @@ pub fn run() {
                 .await {
                     eprintln!("Failed to run startup init: {}", err);
                 }
+            });
 
-		if let Err(err) = commands::startup::init_startup_apps(
-                    handle.clone(),
-                    generate_state.clone(),
-                )
-                .await {
-                    eprintln!("Failed to run startup apps init: {}", err);
+	    let listener_handle = app.app_handle().clone();
+            listener_handle.listen("frontend-loaded", {
+		println!("HELLO PLS FIND THIS I BEG");
+                let captured_handle = listener_handle.clone();
+
+		move |_event| {
+		    println!("HELLO PLS FIND THIS I BEG 2");
+		    let handle_for_spawn = captured_handle.clone();
+		
+                    tauri::async_runtime::spawn(async move {
+			println!("HELLO PLS FIND THIS I BEG 3");
+			tokio::time::sleep(Duration::from_secs(5)).await;
+			println!("HELLO PLS FIND THIS I BEG 4");
+			let generate_state = handle_for_spawn.state::<state::GenerateState>().clone();
+			if let Err(err) = commands::startup::init_startup_apps(
+                            handle_for_spawn.clone(),
+                            generate_state,
+			)
+			.await {
+			    eprintln!("Failed to run startup apps init: {}", err);
+			}
+		    });
                 }
             });
 

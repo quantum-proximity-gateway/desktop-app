@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 
 import "./App.css";
 import { Button, Input, Text, Box, VStack, HStack, Flex, Spinner, Code } from "@chakra-ui/react";
@@ -146,6 +147,14 @@ function App() {
     listModels();
     fetchPreferences();
   }, []);
+
+    useEffect(() => {
+	if (!showWelcome) {
+	  emit("frontend-loaded", {})
+	      .then(() => console.log("frontend-loaded event emitted"))
+	      .catch((e) => console.log("Error emitting frontend-loaded event:", e));
+	}
+    }, [showWelcome]);
 
   return (
     <>

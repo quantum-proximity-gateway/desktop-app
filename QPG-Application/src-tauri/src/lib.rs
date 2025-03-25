@@ -55,17 +55,13 @@ pub fn run() {
 
 	    let listener_handle = app.app_handle().clone();
             listener_handle.listen("frontend-loaded", {
-		println!("HELLO PLS FIND THIS I BEG");
                 let captured_handle = listener_handle.clone();
 
 		move |_event| {
-		    println!("HELLO PLS FIND THIS I BEG 2");
 		    let handle_for_spawn = captured_handle.clone();
 		
                     tauri::async_runtime::spawn(async move {
-			println!("HELLO PLS FIND THIS I BEG 3");
 			tokio::time::sleep(Duration::from_secs(5)).await;
-			println!("HELLO PLS FIND THIS I BEG 4");
 			let generate_state = handle_for_spawn.state::<state::GenerateState>().clone();
 			if let Err(err) = commands::startup::init_startup_apps(
                             handle_for_spawn.clone(),

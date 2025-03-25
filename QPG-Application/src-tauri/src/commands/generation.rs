@@ -214,3 +214,41 @@ pub async fn execute_command_impl(
 
     Ok(())
 }
+
+pub async fn execute_command_app_impl(
+    command: String,
+    app_handle: AppHandle,
+    state: State<'_, GenerateState>,
+) -> Result<(), String> {
+    if !command.ends_with(" &") {
+	return Err("Startup app command must end w/ ' &'".to_string());
+    }
+
+    let command_base = command.trim_end_matches(" &").trim().to_string();
+    let startup_apps = state.get_startup_apps().await;
+
+    if !startup_apps.contains(&command_base) {
+	return Err(format!("Unrecognized/unauthorized command base: '{}'. Will not execute command.", command_base));
+    }
+
+    let bg_app_cmd = format!("nohup {} >/dev/null 2>&1 &", command_base);
+    println!("Attempting to run shell command: sh -c {}", bg_app_cmd);
+    let shell = app_handle.shell();
+
+    match shell.command("sh").args(["-c", &bg_app_cmd]).output().await {
+	Ok(output) => {
+	    if output.status.success() {
+		let stdout_str = String::from_utf8(output.stdout).unwrap_or_default();
+		println!("Command succeeded, stdout: {:?}", stdout_str)
+	    } else {
+		println!("Exit with code: {}", output.status.code().unwrap_or_default());
+	    }
+	}
+	Err(e) => {
+            println!("Failed to execute command: {} with error {}", command, e);	    
+	}
+    }
+    println!("[execute_startup_app_command] Command executed: {}", command);
+
+    Ok(())
+}

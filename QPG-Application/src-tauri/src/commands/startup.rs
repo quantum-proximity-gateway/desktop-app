@@ -4,6 +4,7 @@ use crate::preferences;
 use crate::state::{EncryptionClientInstance, GenerateState};
 use crate::models::{DefaultValue, Setting};
 use serde_json::Value;
+use std::time::Duration;
 
 #[tauri::command]
 pub async fn init_startup_commands(
@@ -63,5 +64,31 @@ pub async fn init_startup_commands(
             }
         }
     }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn init_startup_apps(
+    app_handle: AppHandle,
+    state: State<'_, GenerateState>,
+) -> Result<(), String> {
+    let startup_apps = state.get_startup_apps().await;
+    println!("[startup_apps_init] startup_apps = {:?}", startup_apps);
+
+    for app in startup_apps {
+	let full_command = format!("{} &", app);
+	println!("[startup_apps_init] Launching: {}", full_command.trim_end_matches(" &").trim().to_string());
+
+	if let Err(e) = super::generation::execute_command_app_impl(
+	    full_command,
+	    app_handle.clone(),
+	    state.clone(),
+	).await {
+	    println!("Warning: failed to run startup command. Error: {}", e);
+	}
+
+	tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    
     Ok(())
 }

@@ -14,7 +14,7 @@
 
 ## Building
 
-Refer to the [Releases](https://github.com/quantum-proximity-gateway/desktop-app/releases/tag/app-v0.1.0) page to download and build the application.
+Refer to the [Releases](https://github.com/quantum-proximity-gateway/desktop-app/releases) page to download and build the application.
 
 > NOTE: For proper command execution, you must run it on a GNOME-based GUI (any flavour of Linux e.g. Kali-Linux).
 
@@ -23,6 +23,10 @@ Refer to the [Releases](https://github.com/quantum-proximity-gateway/desktop-app
 - Ensure ollama is running and active
 
 - Run the built application
+
+	- This can be done either by finding the app and double clicking on it OR
+	
+	- By opening the terminal, navigating to the directory with the file and running `./<name of the file>`
 
 ---
 

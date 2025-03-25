@@ -1,5 +1,17 @@
 # QPG Desktop Application
 
+<details>
+  <summary><strong>Table of Contents</strong></summary>
+
+- [Building](#building)
+- [Running](#running)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Development](#development)
+
+</details>
+
 ## Building
 
 Refer to the [Releases](https://github.com/quantum-proximity-gateway/desktop-app/releases/tag/app-v0.1.0) page to download and build the application.

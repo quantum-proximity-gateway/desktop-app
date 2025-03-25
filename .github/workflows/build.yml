@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - release
-      - ci-cd-for-building
 
 jobs:
   publish-tauri:

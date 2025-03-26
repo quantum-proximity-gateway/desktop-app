@@ -9,6 +9,8 @@
 - [Installation](#installation)
 - [Usage](#usage)
 - [Development](#development)
+- [Misc.](#misc)
+- [License](#license)
 
 </details>
 

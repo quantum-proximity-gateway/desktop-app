@@ -1,14 +1,19 @@
 use reqwest::Client;
 use std::fs;
+use std::env;
 use serde_json::Value;
 use tauri::State;
+use once_cell::sync::Lazy;
 use crate::state::{EncryptionClientInstance, GenerateState};
 use crate::models::{AppConfig, Setting, UpdateJSONPreferencesRequest, DefaultValue};
 use crate::encryption::DecryptData;
 
-pub const OLLAMA_BASE_URL: &str = "https://52db-5-151-28-145.ngrok-free.app";
-// pub const SERVER_URL: &str = "https://litestar-server.1t65wn3ankpt.eu-gb.codeengine.appdomain.cloud";
-pub const SERVER_URL: &str = "https://f52a-144-82-8-1.ngrok-free.app";
+pub static OLLAMA_BASE_URL: Lazy<String> = Lazy::new(|| {
+    env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string())
+});
+pub static SERVER_URL: Lazy<String> = Lazy::new(|| {
+    env::var("SERVER_URL").unwrap_or_else(|_| "https://litestar-server.1t65wn3ankpt.eu-gb.codeengine.appdomain.cloud".to_string())
+});
 
 pub async fn fetch_preferences_impl(
     username: &str,
@@ -37,7 +42,7 @@ pub async fn fetch_preferences_impl(
         }
     };
 
-    let mut url = url::Url::parse(&format!("{}/preferences/{}", SERVER_URL, username)).unwrap();
+    let mut url = url::Url::parse(&format!("{}/preferences/{}", SERVER_URL.to_string(), username)).unwrap();
     url.query_pairs_mut().append_pair("client_id", &encryption_client.client_id);
     let client = Client::new();
 
@@ -203,7 +208,7 @@ pub async fn update_json_current_value(
 
     let encrypted_payload = encryption_client.encrypt_data(&json_payload);
 
-    let post_url = format!("{}/preferences/update", SERVER_URL);
+    let post_url = format!("{}/preferences/update", SERVER_URL.to_string());
     let update_resp = client
         .post(&post_url)
         .json(&encrypted_payload?)

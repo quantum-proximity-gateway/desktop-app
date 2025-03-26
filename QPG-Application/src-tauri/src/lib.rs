@@ -1,5 +1,6 @@
 use tauri::{Emitter, Listener, Manager};
 use std::time::Duration;
+use dotenv::{dotenv, from_filename};
 mod commands;
 mod preferences;
 mod state;
@@ -14,6 +15,10 @@ pub use commands::{
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if dotenv().is_err() {
+	from_filename(".env.example").ok();
+    }
+    
     tauri::Builder::default()
         .setup(move |app| {
             let app_handle = app.app_handle().clone();
@@ -21,7 +26,7 @@ pub fn run() {
             app.manage(state::GenerateState::default());
             
             let encryption_client = tauri::async_runtime::block_on(async {
-                match encryption::EncryptionClient::new(preferences::SERVER_URL).await {
+                match encryption::EncryptionClient::new(&preferences::SERVER_URL.to_string()).await {
                     Ok(client) => {
                         println!("EncryptionClient created successfully!");
                         client
@@ -80,7 +85,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(state::OllamaInstance(tauri::async_runtime::Mutex::new(
             ollama_rs::Ollama::new_with_history_from_url(
-                url::Url::parse(preferences::OLLAMA_BASE_URL).unwrap(),
+                url::Url::parse(&preferences::OLLAMA_BASE_URL.to_string()).unwrap(),
                 50,
             )
         )))

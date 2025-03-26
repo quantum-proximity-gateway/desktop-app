@@ -9,6 +9,8 @@
 - [Installation](#installation)
 - [Usage](#usage)
 - [Development](#development)
+- [Misc.](#misc)
+- [License](#license)
 
 </details>
 
@@ -62,14 +64,6 @@ ollama serve
 
 > NOTE: You can check if ollama is running by trying to access `http://localhost:11434` in a browser.
 
-To start the application, run:
-
-```bash
-npm run tauri dev
-```
-
-## Development
-
 To build the application for production, run:
 
 ```bash
@@ -77,3 +71,21 @@ npm run tauri build
 ```
 
 The built application can be found in `QPG-Application/src-tauri/target/release/`.
+
+## Development
+
+To start the application in development mode instead, run:
+
+```bash
+npm run tauri dev
+```
+
+## Misc.
+
+- If you want to change the ollama and server URLs, they are located in `QPG-Application/.env.example`.
+
+- Instead of using the commands listed above individually, you can run `make dev` or `make build` from the root directory of this project to install the necessary packages and run/build the project.
+
+## License
+
+This project is licensed under the terms of the MIT license. Refer to [LICENSE](LICENSE) for more information.

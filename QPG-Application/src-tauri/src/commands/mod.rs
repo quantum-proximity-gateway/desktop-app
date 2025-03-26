@@ -14,7 +14,7 @@ use tauri_plugin_shell::ShellExt;
 pub async fn list_models() -> Result<Vec<String>, String> {
     use ollama_rs::Ollama;
     let ollama = Ollama::new_with_history_from_url(
-        url::Url::parse(preferences::OLLAMA_BASE_URL).unwrap(),
+        url::Url::parse(&preferences::OLLAMA_BASE_URL.to_string()).unwrap(),
         50,
     );
     let default_model_name = "granite3-dense:8b".to_string();

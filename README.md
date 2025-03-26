@@ -83,3 +83,7 @@ npm run tauri dev
 - If you want to change the ollama and server URLs, they are located in `QPG-Application/.env.example`.
 
 - Instead of using the commands listed above individually, you can run `make dev` or `make build` from the root directory of this project to install the necessary packages and run/build the project.
+
+## License
+
+This project is licensed under the terms of the MIT license. Refer to [LICENSE](LICENSE) for more information.

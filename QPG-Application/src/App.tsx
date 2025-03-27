@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 
 import "./App.css";
-import { Button, Input, Text, Box, HStack, Flex, Spinner, Code } from "@chakra-ui/react";
+import { Button, Input, Text, Box, HStack, Flex, Spinner, Code, Image } from "@chakra-ui/react";
 import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody} from "@chakra-ui/modal";
 
 function App() {
@@ -206,14 +206,17 @@ function App() {
           borderBottomWidth="1px"
           borderBottomColor="gray.200"
         >
-          <Text 
-            fontSize="xl" 
-            fontWeight="bold"
-            background="linear-gradient(to right, #2c3e50, #4286f4)"
-            backgroundClip="text"
-          >
-            IBM Proximity Agents
-          </Text>
+          <Flex align="center" gap={3}>
+            <Image src="src/assets/ibm.png" alt="IBM Logo" width={125} height={50}/>
+            <Text 
+              fontSize="xl" 
+              fontWeight="bold"
+              background="linear-gradient(to right, #2c3e50, #4286f4)"
+              backgroundClip="text"
+            >
+              Proximity Agents
+            </Text>
+          </Flex>
         
         <HStack>
           <Button 

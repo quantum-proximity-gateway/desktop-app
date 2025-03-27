@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 
 import "./App.css";
-import { Button, Input, Text, Box, VStack, HStack, Flex, Spinner, Code } from "@chakra-ui/react";
+import { Button, Input, Text, Box, HStack, Flex, Spinner, Code } from "@chakra-ui/react";
 import { Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody} from "@chakra-ui/modal";
 
 function App() {
@@ -12,7 +12,7 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<MessageType[]>([{ sender: "", text: "" }]);
   const [chatID, setChatID] = useState("");
-  const [preferences, setPreferences] = useState<AppConfig | null>(null);
+  const [preferences, setPreferences] = useState<string | null>(null);
   const [open, setOpen] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true);
   const [isFading, setIsFading] = useState(false);
@@ -70,33 +70,14 @@ function App() {
     content: string;
   };
 
-  type Commands = {
-    windows: string;
-    macos: string;
-    gnome: string;
-  };
-
-  type DefaultValue = number | boolean | string;
-
-  type Settings = {
-    lower_bound?: number;
-    upper_bound?: number;
-    current: DefaultValue;
-    commands: Commands;
-  };
-
-  type AppConfig = Record<string, Settings>;
-  
-  interface PreferencesAPIResponse {
-    preferences: AppConfig;
-  } 
-
   async function fetchPreferences() {
     try {
-      const prefs = await invoke<PreferencesAPIResponse>("fetch_preferences");
-      setPreferences(prefs.preferences);
+      const preferences = await invoke<string>('fetch_full_json');
+      setPreferences(preferences);
+      setOpen(true);
     } catch (error) {
-      console.error("Failed to fetch preferences:", error);
+      console.error('Failed to fetch preferences:', error);
+      throw error; // Re-throw the error to be handled by the caller
     }
   }
 
@@ -145,7 +126,6 @@ function App() {
   useEffect(() => {
     pingStatus();
     listModels();
-    fetchPreferences();
   }, []);
 
     useEffect(() => {
@@ -240,7 +220,7 @@ function App() {
             colorScheme="blue" 
             variant="ghost" 
             size="sm"
-            onClick={() => setOpen(true)}
+            onClick={() => fetchPreferences()}
           >
             <span style={{marginRight: '8px'}}>⚙️</span>
             Preferences
@@ -253,56 +233,11 @@ function App() {
                 <Text fontSize="xl" fontWeight="bold">Preferences</Text>
               </ModalHeader>
               <ModalBody py={6}>
-                {preferences ? (
+              {preferences ? (
                   <>
-                    <Text fontWeight="bold" mb={4}>Current Preferences:</Text>
-                    <VStack align="start">
-                      {Object.entries(preferences).map(([key, settings], index) => (
-                        <Box 
-                          key={index} 
-                          borderWidth="1px" 
-                          borderRadius="lg" 
-                          p={5} 
-                          width="100%" 
-                          bg="white" 
-                          shadow="md"
-                          transition="transform 0.2s"
-                          _hover={{ transform: "translateY(-2px)" }}
-                        >
-                          <Flex justify="space-between" align="center" mb={3}>
-                            <Text fontWeight="bold" fontSize="lg" color="blue.600">{key}</Text>
-                            <Text 
-                              py={1} 
-                              px={3} 
-                              bg="blue.50" 
-                              color="blue.700" 
-                              borderRadius="full" 
-                              fontSize="sm"
-                            >
-                              Current: {settings.current.toString()}
-                            </Text>
-                          </Flex>
-                          
-                          {(settings.lower_bound !== undefined || settings.upper_bound !== undefined) && (
-                            <Box mb={3} p={2} bg="gray.50" borderRadius="md">
-                              {settings.lower_bound !== undefined && (
-                                <Text fontSize="sm">Lower Bound: <Code>{settings.lower_bound}</Code></Text>
-                              )}
-                              {settings.upper_bound !== undefined && (
-                                <Text fontSize="sm">Upper Bound: <Code>{settings.upper_bound}</Code></Text>
-                              )}
-                            </Box>
-                          )}
-                          
-                          <Text mt={2} fontWeight="medium" mb={2}>Commands:</Text>
-                          <Box pl={2} borderLeftWidth="2px" borderColor="blue.200">
-                            <Text mb={2}><Code>Windows:</Code> {settings.commands.windows}</Text>
-                            <Text mb={2}><Code>MacOS:</Code> {settings.commands.macos}</Text>
-                            <Text><Code>GNOME:</Code> {settings.commands.gnome}</Text>
-                          </Box>
-                        </Box>
-                      ))}
-                    </VStack>
+                    <pre>
+                      <Code>{JSON.stringify(JSON.parse(preferences), null, 2)}</Code>
+                    </pre>
                   </>
                 ) : (
                   <Flex justify="center" align="center" height="200px">

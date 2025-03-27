@@ -207,7 +207,7 @@ function App() {
           borderBottomColor="gray.200"
         >
           <Flex align="center" gap={3}>
-            <Image src="src/assets/ibm.png" alt="IBM Logo" width={125} height={50}/>
+            <Image src="/ibm.png" alt="IBM Logo" width={125} height={50}/>
             <Text 
               fontSize="xl" 
               fontWeight="bold"

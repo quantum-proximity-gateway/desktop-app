@@ -74,6 +74,11 @@ pub async fn fetch_preferences(
 }
 
 #[tauri::command]
+pub async fn fetch_full_json(state: State<'_, GenerateState>) -> Result<String, String> {
+    Ok(state.get_full_json().await)
+}
+
+#[tauri::command]
 pub async fn execute_command(
     command: String,
     update: bool,

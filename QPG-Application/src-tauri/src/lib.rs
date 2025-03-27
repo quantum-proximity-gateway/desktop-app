@@ -10,7 +10,7 @@ mod models;
 pub use commands::{
     execute_command, execute_startup_app_command, fetch_preferences,
     generate, get_username, init_startup_commands,
-    init_startup_apps, list_models, check_encryption_client
+    init_startup_apps, list_models, check_encryption_client, fetch_full_json
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -100,7 +100,8 @@ pub fn run() {
             execute_command,
 	    execute_startup_app_command,
             get_username,
-            check_encryption_client
+            check_encryption_client,
+            fetch_full_json
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
